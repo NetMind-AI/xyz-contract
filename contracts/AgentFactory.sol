@@ -17,9 +17,9 @@ contract AgentFactory is
 {
     using SafeERC20 for IERC20;
     
-    bool    private locked;
     uint256 private _nextId;                      // ApplicationId
-    address public gov;                           // Gov contract, Dao or Management
+    address public gov;                           // Gov contract, Dao or Management, not use
+    address public bonding;                       // Bonding contract
     address public assetToken;                    // Base currency                                      
     address public tokenImplementation;           // Agent token implementation
     address public agentNFT;                      // XYZ agent NFT
@@ -30,6 +30,7 @@ contract AgentFactory is
 
 
     address[] public allTokens;
+    address[] public graduates;
 
     enum ApplicationStatus {
         Internal,
@@ -52,19 +53,17 @@ contract AgentFactory is
     event GovUpdated(address oldGov, address newGov);
     event FundThresholdUpdated(uint256 oldThreshold, uint256 newThreshold);
     event NewApplication(uint256 id, string name, address token, address proposal);
+    event Graduate(uint256 id, address newDexPair);
 
     modifier onlyGov() {
         require(msg.sender == gov, "Only GOV can execute proposal");
         _;
     }
 
-    modifier noReentrant() {
-        require(!locked, "cannot reenter");
-        locked = true;
+    modifier onlyBonding() {
+        require(msg.sender == gov, "Only Bonding can execute");
         _;
-        locked = false;
     }
-
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -73,6 +72,7 @@ contract AgentFactory is
 
     function initialize(
         address gov_,
+        address bonding_,
         address assetToken_,
         address tokenImplementation_,
         address agentNFT_,
@@ -81,9 +81,8 @@ contract AgentFactory is
         uint256 fee_,
         uint256 fundThreshold_
     ) public initializer {
-        __Pausable_init();
-        
         gov = gov_;
+        bonding = bonding_;
         assetToken = assetToken_;
         tokenImplementation = tokenImplementation_;
         agentNFT = agentNFT_;
@@ -91,14 +90,13 @@ contract AgentFactory is
         feeTo = feeTo_;
         fee = fee_;
         fundThreshold = fundThreshold_;
-        
     }
 
     function newApplication(
         address token,
         address fundPair,
         address proposer
-    ) public returns(uint256 applicationId){
+    ) public onlyBonding returns(uint256 applicationId){
         IERC20(assetToken).safeTransferFrom(
             msg.sender,
             feeTo,
@@ -130,6 +128,15 @@ contract AgentFactory is
         emit NewApplication(id, name, token, proposer);
 
         return id;
+    }
+
+    function graduate(uint256 id, address dexPair) public onlyBonding{
+        Application storage app = _applications[id];
+        app.dexPair = dexPair;
+
+        graduates.push(app.token);
+
+        emit Graduate(id, dexPair);
     }
 
     function getApplication(
