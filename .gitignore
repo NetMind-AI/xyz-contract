@@ -4,8 +4,9 @@ coverage
 coverage.json
 typechain
 typechain-types
-
+.idea
 # Hardhat files
 cache
 artifacts
 
+.DS_Store
