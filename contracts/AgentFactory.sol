@@ -2,16 +2,13 @@
 pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/proxy/Clones.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 
 import "./interface/IAgentFactory.sol";
 import "./interface/IAgentNFT.sol";
-import "./interface/IAgentToken.sol";
-
-
 
 contract AgentFactory is
     IAgentFactory,
@@ -43,6 +40,8 @@ contract AgentFactory is
         string name;
         string symbol;
         address token;
+        address fundPair;           // Internal Pair
+        address dexPair;            // Public Pair
         address proposer;
         string  agentURI;           // Agent NFT tokenURI
         ApplicationStatus status;
@@ -96,8 +95,8 @@ contract AgentFactory is
     }
 
     function newApplication(
-        string memory name, 
-        string memory symbol,
+        address token,
+        address fundPair,
         address proposer
     ) public returns(uint256 applicationId){
         IERC20(assetToken).safeTransferFrom(
@@ -108,18 +107,21 @@ contract AgentFactory is
 
         uint256 id = _nextId++;
 
-        //C1: Mint Agent NFT
+        //Mint Agent NFT
         uint256 tokenId = IAgentNFT(agentNFT).safeMint(agentVault);
-
-        //C2: Clone Agent ERC20 Token
-        address token = _createNewAgentToken(name, symbol);
-
+        string memory tokenURI = IAgentNFT(agentNFT).tokenURI(tokenId);
+        
+        string memory name = IERC20Metadata(token).name();
+        string memory symbol = IERC20Metadata(token).symbol();
+        
         Application memory application = Application(
             name,
             symbol,
             token,
+            fundPair,
+            address(0),
             proposer,
-            IAgentNFT(agentNFT).tokenURI(tokenId),
+            tokenURI,
             ApplicationStatus.Internal
         );
 
@@ -133,16 +135,6 @@ contract AgentFactory is
         uint256 proposalId
     ) public view returns (Application memory) {
         return _applications[proposalId];
-    }
-    
-
-    function _createNewAgentToken(
-        string memory name,
-        string memory symbol
-    ) internal returns (address instance) {
-        instance = Clones.clone(tokenImplementation);
-        IAgentToken(instance).initialize(name, symbol);
-        return instance;
     }
 
     function totalAgents() public view returns (uint256) {
