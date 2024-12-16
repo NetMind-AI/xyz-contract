@@ -1,5 +1,6 @@
 require("@nomicfoundation/hardhat-toolbox");
-
+// require("hardhat-deploy");
+require("@openzeppelin/hardhat-upgrades");
 require('dotenv').config({ path: __dirname + '/.env' })
 
 /** @type import('hardhat/config').HardhatUserConfig */
@@ -25,6 +26,7 @@ module.exports = {
     },
     bscTestnet: {
       url: process.env.RPC_URL,
+      gasPrice: 1000000000,
       accounts: [process.env.PRIVATE_KEY],
     },
 
