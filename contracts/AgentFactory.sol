@@ -20,39 +20,26 @@ contract AgentFactory is
     uint256 private _nextId;                      // ApplicationId
     address public gov;                           // Gov contract, Dao or Management, not use
     address public bonding;                       // Bonding contract
-    address public assetToken;                    // Base currency                                      
-    address public tokenImplementation;           // Agent token implementation
     address public agentNFT;                      // XYZ agent NFT
     address public agentVault;                    // XYZ agent NFT Vault
-    address public feeTo;                         // Fee reciver
-    uint256 public fee;                           // Fee amount
-    uint256 public fundThreshold;                 // Fund threshold
-
 
     address[] public allTokens;
     address[] public graduates;
 
-    enum ApplicationStatus {
-        Internal,
-        Public
-    }
-
     struct Application {
-        string name;
-        string symbol;
-        address token;
-        address fundPair;           // Internal Pair
-        address dexPair;            // Public Pair
-        address proposer;
-        string  agentURI;           // Agent NFT tokenURI
-        ApplicationStatus status;
+        string  name;                // Agent name
+        address token;               // Agent token address
+        string  agentURI;            // Agent NFT tokenURI
+        address fundPair;            // Internal Pair
+        address dexPair;             // Public Pair
     }
 
     mapping(uint256 => Application) private _applications;
+    mapping(address => uint256) private _applicationIds;
 
     event GovUpdated(address oldGov, address newGov);
     event FundThresholdUpdated(uint256 oldThreshold, uint256 newThreshold);
-    event NewApplication(uint256 id, string name, address token, address proposal);
+    event NewApplication(uint256 id, string name, address token);
     event Graduate(uint256 id, address newDexPair);
 
     modifier onlyGov() {
@@ -73,64 +60,44 @@ contract AgentFactory is
     function initialize(
         address gov_,
         address bonding_,
-        address assetToken_,
-        address tokenImplementation_,
         address agentNFT_,
-        address agentVault_,
-        address feeTo_,
-        uint256 fee_,
-        uint256 fundThreshold_
+        address agentVault_
     ) public initializer {
         gov = gov_;
         bonding = bonding_;
-        assetToken = assetToken_;
-        tokenImplementation = tokenImplementation_;
         agentNFT = agentNFT_;
         agentVault = agentVault_;
-        feeTo = feeTo_;
-        fee = fee_;
-        fundThreshold = fundThreshold_;
     }
 
     function newApplication(
+        string memory name,
         address token,
-        address fundPair,
-        address proposer
-    ) public onlyBonding returns(uint256 applicationId){
-        IERC20(assetToken).safeTransferFrom(
-            msg.sender,
-            feeTo,
-            fee
-        );
-
+        address fundPair
+    ) public onlyBonding {
         uint256 id = _nextId++;
 
         //Mint Agent NFT
         uint256 tokenId = IAgentNFT(agentNFT).safeMint(agentVault);
         string memory tokenURI = IAgentNFT(agentNFT).tokenURI(tokenId);
         
-        string memory name = IERC20Metadata(token).name();
-        string memory symbol = IERC20Metadata(token).symbol();
-        
         Application memory application = Application(
             name,
-            symbol,
             token,
-            fundPair,
-            address(0),
-            proposer,
             tokenURI,
-            ApplicationStatus.Internal
+            fundPair,
+            address(0)
         );
 
         _applications[id] = application;
-        allTokens.push(token);
-        emit NewApplication(id, name, token, proposer);
+        _applicationIds[token] = id;
 
-        return id;
+        allTokens.push(token);
+        emit NewApplication(id, name, token);
     }
 
-    function graduate(uint256 id, address dexPair) public onlyBonding{
+    function graduate(address token, address dexPair) public onlyBonding{
+        uint256 id = _applicationIds[token];
+        require(id > 0, "No application with this token");
         Application storage app = _applications[id];
         app.dexPair = dexPair;
 
