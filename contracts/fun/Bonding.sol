@@ -82,9 +82,8 @@ contract Bonding is
     mapping(address => Token) public tokenInfo;
     address[] public tokenInfos;
 
-    event Launched(address indexed token, address indexed pair, uint);
-    event Deployed(address indexed token, uint256 amount0, uint256 amount1);
-    event Graduated(address indexed token, address agentToken);
+    event Launched(address indexed token, address indexed pair);
+    event Graduated(address indexed token, address indexed uniPair);
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -210,7 +209,7 @@ contract Bonding is
         string memory img,
         string[4] memory urls,
         uint256 purchaseAmount
-    ) public nonReentrant returns (address, address, uint) {
+    ) public nonReentrant {
         require(
             purchaseAmount > fee,
             "Purchase amount must be greater than fee"
@@ -304,17 +303,12 @@ contract Bonding is
                 _profile.tokens.push(address(token));
             }
         }
-
-        uint n = tokenInfos.length;
-
-        emit Launched(address(token), _pair, n);
+        emit Launched(address(token), _pair);
 
         // Make initial purchase
         IERC20(assetToken).forceApprove(address(router), initialPurchase);
         router.buy(initialPurchase, address(token), address(this));
         token.transfer(msg.sender, token.balanceOf(address(this)));
-
-        return (address(token), _pair, n);
     }
 
     function sell(
@@ -373,7 +367,7 @@ contract Bonding is
     function buy(
         uint256 amountIn,
         address tokenAddress
-    ) public payable returns (bool) {
+    ) public returns (bool) {
         require(tokenInfo[tokenAddress].trading, "Token not trading");
 
         address pairAddress = factory.getPair(
@@ -457,7 +451,7 @@ contract Bonding is
         token_.transfer(tokenAddress, tokenBalance);
         token_.addInitialLiquidity(address(this));
         agentFactory.graduate(address(token_), lp);
-
+        emit Graduated(address(token_), lp);
     }
 
 
