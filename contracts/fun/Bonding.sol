@@ -162,7 +162,7 @@ contract Bonding is
     }
 
     function setAgentFactory(address agentFactory_) public onlyOwner {
-        agentFactory = agentFactory_;
+        agentFactory = IAgentFactory(agentFactory_);
     }
 
     function setAssetRate(uint256 newRate) public onlyOwner {
@@ -230,6 +230,12 @@ contract Bonding is
         IAgentToken token = IAgentToken(Clones.clone(agentTokenImpl));
 
         address _pair = factory.createPair(address(token), assetToken);
+        string memory name = string.concat(_name, " by NetMind XYZ");
+        agentFactory.newApplication(
+            name,
+            address(token),
+            _pair
+        );
         bytes memory tokenParams = abi.encode(
             initialSupply,
             taxSwapThresholdBasisPoints,
@@ -242,7 +248,7 @@ contract Bonding is
             uniswapRouter,
             tokenAdmin
         );
-        token.initialize(string.concat(_name, " by NetMind AI"), _ticker, tokenParams);
+        token.initialize(name, _ticker, tokenParams);
         uint256 supply = token.totalSupply();
         bool approved = _approval(address(router), address(token), supply);
         require(approved);
@@ -450,7 +456,7 @@ contract Bonding is
         IERC20(assetToken).transfer(tokenAddress, assetBalance);
         token_.transfer(tokenAddress, tokenBalance);
         token_.addInitialLiquidity(address(this));
-    agentFactory.graduate();
+        agentFactory.graduate(address(token_), lp);
 
     }
 

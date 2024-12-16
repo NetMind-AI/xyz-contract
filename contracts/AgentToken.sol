@@ -53,8 +53,6 @@ contract AgentToken is
     address public uniswapV2Pair;
     IUniswapV2Router02 internal _uniswapRouter;
 
-
-
     modifier onlyOwnerOrBonding() {
         if (owner() != _msgSender() && address(bonding) != _msgSender()) {
             revert CallerIsNotAdminNorBonding();
