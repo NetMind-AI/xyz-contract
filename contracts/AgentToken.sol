@@ -79,7 +79,7 @@ contract AgentToken is
             (ERC20Parameters)
         );
         __Ownable_init(tokenParams.admin);
-        _mint(address(this), tokenParams.supply);
+        _mint(_msgSender(), tokenParams.supply);
         vaultToken = tokenParams.vaultToken;
         _uniswapRouter = IUniswapV2Router02(tokenParams.uniswapRouter);
 
@@ -600,7 +600,7 @@ contract AgentToken is
             revert InitialLiquidityNotYetAdded();
         }
 
-        if (to_ != fPair && from_ != fPair && fundedDate == 0) {
+        if (to_ != fPair && from_ != fPair && to_ != bonding && from_ != bonding && fundedDate == 0) {
             revert InitialTransferTime();
         }
 

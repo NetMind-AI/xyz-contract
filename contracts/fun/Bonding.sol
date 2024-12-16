@@ -14,6 +14,7 @@ import "./FFactory.sol";
 import "../interface/IFPair.sol";
 import "./FRouter.sol";
 import "../interface/IAgentToken.sol";
+import "../interface/IAgentFactory.sol";
 
 contract Bonding is
     Initializable,
@@ -36,7 +37,7 @@ contract Bonding is
     uint256 public constant K = 3_000_000_000_000;
     uint256 public assetRate;
     uint256 public gradThreshold;
-    address public agentFactory;
+    IAgentFactory public agentFactory;
     address public uniswapRouter;
     address public agentTokenImpl;
 
@@ -115,7 +116,7 @@ contract Bonding is
         initialSupply = initialSupply_;
         assetRate = assetRate_;
 
-        agentFactory = agentFactory_;
+        agentFactory = IAgentFactory(agentFactory_);
         gradThreshold = gradThreshold_;
         uniswapRouter = uniswapRouter_;
         tokenAdmin = tokenAdmin_;
@@ -149,6 +150,10 @@ contract Bonding is
 
     function setGradThreshold(uint256 newThreshold) public onlyOwner {
         gradThreshold = newThreshold;
+    }
+
+    function setAgentTokenImpl(address newAgentTokenImpl) public onlyOwner {
+        agentTokenImpl = newAgentTokenImpl;
     }
 
     function setFee(uint256 newFee, address newFeeTo) public onlyOwner {
@@ -445,6 +450,7 @@ contract Bonding is
         IERC20(assetToken).transfer(tokenAddress, assetBalance);
         token_.transfer(tokenAddress, tokenBalance);
         token_.addInitialLiquidity(address(this));
+    agentFactory.graduate();
 
     }
 

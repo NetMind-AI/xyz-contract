@@ -24,7 +24,7 @@ async function exec() {
   let FFactory = await deploy('FFactory',0,'FFactory')
   let FFactoryProxy = await deploy('FFactoryProxy',0,'FFactoryProxy', FFactory.target)
   FFactory = await getContract(0,'FFactory', FFactoryProxy.target.toString())
-  tx = await FFactory.initialize(process.env.TAX_VAULT, process.env.BUY_TAX, process.env.SELL_TAX);
+  tx = await FFactory.initialize(process.env.TAX_VAULT, process.env.FACTORY_BUY_TAX, process.env.FACTORY_SELL_TAX);
   await tx.wait(3);
 
   let ADMIN_ROLE = await FFactory.ADMIN_ROLE()
@@ -45,7 +45,7 @@ async function exec() {
       FRouter.target,
       process.env.FEE_TO,
       process.env.FEE,
-      process.env.INITIAL_SUPPLY,
+      ethers.parseEther(process.env.INITIAL_SUPPLY.toString()),
       process.env.ASSET_RATE,
       process.env.AGENT_FACTORY,
       process.env.UNISWAP_ROUTER,
@@ -60,6 +60,9 @@ async function exec() {
     process.env.SELL_TAX,
     process.env.TAX_RECIPIENT_ADDR,
   );
+  await tx.wait(1);
+  let CREATOR_ROLE = await FFactory.CREATOR_ROLE()
+  await FFactory.grantRole(CREATOR_ROLE, Bonding.target);
   await tx.wait(1);
   let EXECUTOR_ROLE = await FRouter.EXECUTOR_ROLE()
   await FRouter.grantRole(EXECUTOR_ROLE, Bonding.target);

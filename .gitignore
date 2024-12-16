@@ -8,6 +8,7 @@ typechain
 typechain-types
 .idea
 # Hardhat files
+forge-cache
 cache
 artifacts
 param
