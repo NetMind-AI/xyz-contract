@@ -11,9 +11,9 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 
 import "./FFactory.sol";
-import "./IFPair.sol";
+import "../interface/IFPair.sol";
 import "./FRouter.sol";
-import "../IAgentToken.sol";
+import "../interface/IAgentToken.sol";
 
 contract Bonding is
     Initializable,
@@ -51,7 +51,6 @@ contract Bonding is
         address pair;
         Data data;
         string description;
-        uint8[] cores;
         string image;
         string twitter;
         string telegram;
@@ -157,6 +156,10 @@ contract Bonding is
         feeTo = newFeeTo;
     }
 
+    function setAgentFactory(address agentFactory_) public onlyOwner {
+        agentFactory = agentFactory_;
+    }
+
     function setAssetRate(uint256 newRate) public onlyOwner {
         require(newRate > 0, "Rate err");
         assetRate = newRate;
@@ -198,7 +201,6 @@ contract Bonding is
     function launch(
         string memory _name,
         string memory _ticker,
-        uint8[] memory cores,
         string memory desc,
         string memory img,
         string[4] memory urls,
@@ -265,7 +267,6 @@ contract Bonding is
             pair: _pair,
             data: _data,
             description: desc,
-            cores: cores,
             image: img,
             twitter: urls[0],
             telegram: urls[1],

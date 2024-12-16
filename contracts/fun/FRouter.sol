@@ -8,7 +8,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 
 import "./FFactory.sol";
-import "./IFPair.sol";
+import "../interface/IFPair.sol";
 
 contract FRouter is
     Initializable,

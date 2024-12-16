@@ -1,0 +1,14 @@
+[profile.default]
+src = 'contracts'
+out = 'out'
+libs = ['node_modules', 'lib']
+test = 'test/'
+cache_path  = 'forge-cache'
+# See more config options https://github.com/foundry-rs/foundry/tree/master/config
+
+solc = "0.8.22"
+optimizer = true
+runs = 200
+via-ir = true
+
+rpc_endpoints = { bscTestnet = "https://bsc-testnet.nodereal.io/v1/4174f35333e44930b3768400819fc4b7", bsc = "https://rpc.ankr.com/bsc"}
