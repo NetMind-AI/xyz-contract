@@ -9,6 +9,7 @@ async function main() {
         ethers.provider
     );
 
+
     const AgentToken = await ethers.deployContract("AgentToken");
     await AgentToken.waitForDeployment();
 
@@ -61,6 +62,19 @@ async function main() {
     await fFactory.grantRole(CREATOR_ROLE, bonding.target);
     let EXECUTOR_ROLE = await fRouter.EXECUTOR_ROLE()
     await fRouter.grantRole(EXECUTOR_ROLE, bonding.target);
+
+
+    //deploy Agent instances
+    const AgentNFT = await ethers.deployContract("AgentNFT", ethers.provider.address);
+    await AgentNFT.waitForDeployment();
+
+    const AgentVault = await ethers.deployContract("AgentVault", AgentNFT.target, ethers.provider.address);
+    await AgentVault.waitForDeployment();
+    
+    const AgentFactory = await ethers.getContractFactory("AgentFactory");
+    
+
+
 
   } catch (e) {
     console.error(e);
