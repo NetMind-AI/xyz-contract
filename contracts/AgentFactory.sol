@@ -5,7 +5,7 @@ import "@openzeppelin/contracts/proxy/Clones.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
 import "./interface/IAgentFactory.sol";
 import "./interface/IAgentNFT.sol";
@@ -13,15 +13,15 @@ import "./interface/IAgentNFT.sol";
 contract AgentFactory is
     IAgentFactory,
     Initializable,
-    PausableUpgradeable
+    OwnableUpgradeable
 {
     using SafeERC20 for IERC20;
     
-    uint256 private _nextId;                      // ApplicationId
-    address public gov;                           // Gov contract, Dao or Management, not use
-    address public bonding;                       // Bonding contract
-    address public agentNFT;                      // XYZ agent NFT
-    address public agentVault;                    // XYZ agent NFT Vault
+    uint256 private _nextId;          // ApplicationId
+    address public gov;               // Gov contract, Dao or Management, not use
+    address public bonding;           // Bonding contract
+    address public agentNFT;          // XYZ agent NFT
+    address public agentVault;        // XYZ agent NFT Vault
 
     address[] public allTokens;
     address[] public graduates;
@@ -37,14 +37,8 @@ contract AgentFactory is
     mapping(uint256 => Application) private _applications;
     mapping(address => uint256) private _applicationIds;
 
-    event GovUpdated(address oldGov, address newGov);
     event NewApplication(uint256 id, string name, address token);
     event Graduate(uint256 id, address newDexPair);
-
-    modifier onlyGov() {
-        require(msg.sender == gov, "Only GOV can execute proposal");
-        _;
-    }
 
     modifier onlyBonding() {
         require(msg.sender == bonding, "Only Bonding can execute");
@@ -57,12 +51,13 @@ contract AgentFactory is
     }
 
     function initialize(
-        address gov_,
+        address initialOwner,
         address bonding_,
         address agentNFT_,
         address agentVault_
     ) public initializer {
-        gov = gov_;
+        __Ownable_init(initialOwner);
+
         bonding = bonding_;
         agentNFT = agentNFT_;
         agentVault = agentVault_;
@@ -115,7 +110,18 @@ contract AgentFactory is
         return allTokens.length;
     }
 
-    function setVault(address vault) public onlyGov{
-        agentVault = vault;
+    function setVault(address vault_) public onlyOwner{
+        require(vault_ != address(0), "AgentFactory: Invalid vault address");
+        agentVault = vault_;
+    }
+
+    function setBonding(address bonding_) public onlyOwner{
+        require(bonding_ != address(0), "AgentFactory: Invalid Bonding address");
+        bonding = bonding_;
+    }
+
+    function setAgentNFT(address agentNFT_) public onlyOwner{
+        require(agentNFT_ != address(0), "AgentFactory: Invalid Agent NFT address");
+        agentNFT = agentNFT_;
     }
 }

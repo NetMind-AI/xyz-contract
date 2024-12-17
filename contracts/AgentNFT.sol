@@ -19,7 +19,7 @@ contract NetmindAgentNFT is ERC721, Ownable {
     }
 
     function safeMint(address to) public onlyOwner returns(uint256){
-        uint256 tokenId = _nextTokenId++;
+        uint256 tokenId = ++_nextTokenId;
         _safeMint(to, tokenId);
         return tokenId;
     }

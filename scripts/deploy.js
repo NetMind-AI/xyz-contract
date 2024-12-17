@@ -22,7 +22,7 @@ async function exec() {
     let ProxyAdmin = await deploy('ProxyAdmin',0,'ProxyAdmin')
 
     let AgentNFT = await deploy('AgentNFT',0,'NetmindAgentNFT', deployer.address, {file:"AgentNFT"})
-    let AgentVault = await deploy('AgentVault',0,'AgentVault', AgentNFT.target, deployer.address)
+    let AgentVault = await deploy('AgentVault',0,'AgentVault', deployer.address, {file:"AgentVault"})
     let AgentFactory = await deploy('AgentFactory',0,'AgentFactory')
     let AgentFactoryProxy = await deploy('AgentFactoryProxy',0,'TransparentUpgradeableProxy', AgentFactory.target, ProxyAdmin.target, "0x")
     AgentFactory = await getContract(0,'AgentFactory', AgentFactoryProxy.target.toString())
