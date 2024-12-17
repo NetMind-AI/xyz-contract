@@ -16,7 +16,7 @@ contract AgentFactory is
     PausableUpgradeable
 {
     using SafeERC20 for IERC20;
-    
+
     uint256 private _nextId;                      // ApplicationId
     address public gov;                           // Gov contract, Dao or Management, not use
     address public bonding;                       // Bonding contract
@@ -48,7 +48,7 @@ contract AgentFactory is
     }
 
     modifier onlyBonding() {
-        require(msg.sender == gov, "Only Bonding can execute");
+        require(msg.sender == bonding, "Only Bonding can execute");
         _;
     }
 
@@ -79,7 +79,7 @@ contract AgentFactory is
         //Mint Agent NFT
         uint256 tokenId = IAgentNFT(agentNFT).safeMint(agentVault);
         string memory tokenURI = IAgentNFT(agentNFT).tokenURI(tokenId);
-        
+
         Application memory application = Application(
             name,
             token,
