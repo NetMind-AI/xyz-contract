@@ -48,7 +48,7 @@ contract AgentFactory is
     }
 
     modifier onlyBonding() {
-        require(msg.sender == gov, "Only Bonding can execute");
+        require(msg.sender == bonding, "Only Bonding can execute");
         _;
     }
 
@@ -114,5 +114,9 @@ contract AgentFactory is
 
     function totalAgents() public view returns (uint256) {
         return allTokens.length;
+    }
+
+    function setVault(address vault) public onlyGov{
+        agentVault = vault;
     }
 }
