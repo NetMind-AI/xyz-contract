@@ -70,11 +70,13 @@ async function main() {
 
     const AgentVault = await ethers.deployContract("AgentVault", AgentNFT.target, ethers.provider.address);
     await AgentVault.waitForDeployment();
-    
+
     const AgentFactory = await ethers.getContractFactory("AgentFactory");
-    
-
-
+    const agentFactory = await upgrades.deployProxy(
+        AgentFactory,
+        [ethers.provider.address, bonding.target, AgentNFT.target, AgentVault.target],
+        { initializer: 'initialize' });
+  
 
   } catch (e) {
     console.error(e);
