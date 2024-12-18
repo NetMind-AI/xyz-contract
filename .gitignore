@@ -16,3 +16,4 @@ log
 lib
 out
 .DS_Store
+.openzeppelin/bsc-testnet.json

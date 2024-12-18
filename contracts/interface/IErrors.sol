@@ -119,7 +119,7 @@ interface IErrors {
 
   error InvalidAdapterParams(); //                          The current adapter params for LayerZero on this contract won't work :(.
 
-  error InitialTransferTime(); //                           The transfer time has not arrived, and you need to open the trading pair before you can make a transfer.
+  error InvalidTransferTime(); //                           The transfer time has not arrived, and you need to open the trading pair before you can make a transfer.
 
   error InvalidAddress(); //                                An address being processed in the function is not valid.
 

@@ -599,7 +599,7 @@ contract AgentToken is
         }
 
         if (to_ != fPair && from_ != fPair && to_ != bonding && from_ != bonding && fundedDate == 0) {
-            revert InitialTransferTime();
+            revert InvalidTransferTime();
         }
 
         if (from_ == address(0)) {
