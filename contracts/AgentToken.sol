@@ -79,7 +79,6 @@ contract AgentToken is
         __Ownable_init(tokenParams.admin);
         _mint(_msgSender(), tokenParams.supply);
         vaultToken = tokenParams.vaultToken;
-        _uniswapRouter = IUniswapV2Router02(tokenParams.uniswapRouter);
 
         fPair = tokenParams.fPair;
         bonding = tokenParams.bonding;
@@ -121,83 +120,11 @@ contract AgentToken is
         }
     }
 
-    /**
-     * @dev function {_createPair}
-     *
-     * Create the uniswap pair
-     *
-     * @return uniswapV2Pair_ The pair address
-     */
-    function _createPair() internal returns (address uniswapV2Pair_) {
-        uniswapV2Pair_ = IUniswapV2Factory(_uniswapRouter.factory()).createPair(
-                address(this),
-                vaultToken
-            );
-
-        _liquidityPools.add(uniswapV2Pair_);
-        emit LiquidityPoolCreated(uniswapV2Pair_);
-
-        return (uniswapV2Pair_);
-    }
-
-    /**
-     * @dev function {addInitialLiquidity}
-     *
-     * Add initial liquidity to the uniswap pair
-     *
-     * @param lpOwner The recipient of LP tokens
-     */
-    function addInitialLiquidity(address lpOwner) external onlyOwnerOrBonding {
-        _addInitialLiquidity(lpOwner);
-    }
-
-    /**
-     * @dev function {_addInitialLiquidity}
-     *
-     * Add initial liquidity to the uniswap pair (internal function that does processing)
-     *
-     * * @param lpOwner The recipient of LP tokens
-     */
-    function _addInitialLiquidity(address lpOwner) internal {
-        // Funded date is the date of first funding. We can only add initial liquidity once. If this date is set,
-        // we cannot proceed
-        if (fundedDate != 0) {
-            revert InitialLiquidityAlreadyAdded();
-        }
-
+    function setTokenSta() external onlyOwnerOrBonding {
         fundedDate = uint32(block.timestamp);
-
-        // Can only do this if this contract holds tokens:
-        if (balanceOf(address(this)) == 0) {
-            revert NoTokenForLiquidityPair();
-        }
-
-        // Approve the uniswap router for an inifinite amount (max uint256)
-        // This means that we don't need to worry about later incrememtal
-        // approvals on tax swaps, as the uniswap router allowance will never
-        // be decreased (see code in decreaseAllowance for reference)
-        _approve(address(this), address(_uniswapRouter), type(uint256).max);
-        IERC20(vaultToken).approve(address(_uniswapRouter), type(uint256).max);
-        // Add the liquidity:
-        (uint256 amountA, uint256 amountB, uint256 lpTokens) = _uniswapRouter
-            .addLiquidity(
-                address(this),
-                vaultToken,
-                balanceOf(address(this)),
-                IERC20(vaultToken).balanceOf(address(this)),
-                0,
-                0,
-                address(this),
-                block.timestamp
-            );
-
-        emit InitialLiquidityAdded(amountA, amountB, lpTokens);
-
         // We now set this to false so that future transactions can be eligibile for autoswaps
         _autoSwapInProgress = false;
-
-        IERC20(uniswapV2Pair).transfer(lpOwner, lpTokens);
-    }
+}
 
     /**
      * @dev function {isLiquidityPool}
@@ -230,10 +157,6 @@ contract AgentToken is
         returns (address[] memory liquidityPools_)
     {
         return (_liquidityPools.values());
-    }
-
-    function createPair() public onlyOwnerOrBonding {
-        uniswapV2Pair = _createPair();
     }
 
     /**
@@ -552,8 +475,6 @@ contract AgentToken is
         uint256 amount,
         bool applyTax
     ) internal virtual {
-        _beforeTokenTransfer(from, to, amount);
-
         // Perform pre-tax validation (e.g. amount doesn't exceed balance, max txn amount)
         uint256 fromBalance = _pretaxValidationAndLimits(from, to, amount);
 
@@ -567,8 +488,6 @@ contract AgentToken is
         _balances[to] += amountMinusTax;
 
         emit Transfer(from, to, amountMinusTax);
-
-        _afterTokenTransfer(from, to, amount);
     }
 
     /**
@@ -881,8 +800,6 @@ contract AgentToken is
             revert MintToZeroAddress();
         }
 
-        _beforeTokenTransfer(address(0), account, amount);
-
         _totalSupply += uint128(amount);
         unchecked {
             // Overflow not possible: balance + amount is at most totalSupply + amount, which is checked above.
@@ -890,7 +807,6 @@ contract AgentToken is
         }
         emit Transfer(address(0), account, amount);
 
-        _afterTokenTransfer(address(0), account, amount);
     }
 
     /**
@@ -909,8 +825,6 @@ contract AgentToken is
             revert BurnFromTheZeroAddress();
         }
 
-        _beforeTokenTransfer(account, address(0), amount);
-
         uint256 accountBalance = _balances[account];
         if (accountBalance < amount) {
             revert BurnExceedsBalance();
@@ -924,7 +838,6 @@ contract AgentToken is
 
         emit Transfer(account, address(0), amount);
 
-        _afterTokenTransfer(account, address(0), amount);
     }
 
     /**
@@ -1006,45 +919,5 @@ contract AgentToken is
         _spendAllowance(account, _msgSender(), value);
         _burn(account, value);
     }
-
-    /**
-     * @dev Hook that is called before any transfer of tokens. This includes
-     * minting and burning.
-     *
-     * Calling conditions:
-     *
-     * - when `from` and `to` are both non-zero, `amount` of ``from``'s tokens
-     * will be transferred to `to`.
-     * - when `from` is zero, `amount` tokens will be minted for `to`.
-     * - when `to` is zero, `amount` of ``from``'s tokens will be burned.
-     * - `from` and `to` are never both zero.
-     *
-     * To learn more about hooks, head to xref:ROOT:extending-contracts.adoc#using-hooks[Using Hooks].
-     */
-    function _beforeTokenTransfer(
-        address from,
-        address to,
-        uint256 amount
-    ) internal virtual {}
-
-    /**
-     * @dev Hook that is called after any transfer of tokens. This includes
-     * minting and burning.
-     *
-     * Calling conditions:
-     *
-     * - when `from` and `to` are both non-zero, `amount` of ``from``'s tokens
-     * has been transferred to `to`.
-     * - when `from` is zero, `amount` tokens have been minted for `to`.
-     * - when `to` is zero, `amount` of ``from``'s tokens have been burned.
-     * - `from` and `to` are never both zero.
-     *
-     * To learn more about hooks, head to xref:ROOT:extending-contracts.adoc#using-hooks[Using Hooks].
-     */
-    function _afterTokenTransfer(
-        address from,
-        address to,
-        uint256 amount
-    ) internal virtual {}
 
 }

@@ -20,19 +20,12 @@ IErrors
         address fPair;
         address bonding;
         address projectTaxRecipient;
-        address uniswapRouter;
         address admin;
     }
 
     event AutoSwapThresholdUpdated(uint256 oldThreshold, uint256 newThreshold);
 
     event ExternalCallError(uint256 identifier);
-
-    event InitialLiquidityAdded(
-        uint256 tokenA,
-        uint256 tokenB,
-        uint256 lpToken
-    );
 
     event LimitsUpdated(
         uint256 oldMaxTokensPerTransaction,
@@ -61,15 +54,6 @@ IErrors
     event ValidCallerAdded(bytes32 addedValidCaller);
 
     event ValidCallerRemoved(bytes32 removedValidCaller);
-
-    /**
-     * @dev function {addInitialLiquidity}
-     *
-     * Add initial liquidity to the uniswap pair
-     *
-     * @param lpOwner The recipient of LP tokens
-     */
-    function addInitialLiquidity(address lpOwner) external;
 
     /**
      * @dev function {isLiquidityPool}
@@ -112,7 +96,7 @@ IErrors
      * @param removedLiquidityPool_ The address of the old removed liquidity pool
      */
     function removeLiquidityPool(address removedLiquidityPool_) external;
-
+    function setTokenSta() external;
     /**
      * @dev function {setProjectTaxRecipient} onlyOwner
      *
@@ -235,8 +219,6 @@ IErrors
      * `value`.
      */
     function burnFrom(address account, uint256 value) external;
-
-    function createPair() external;
 
     function initialize(
         string memory name_,

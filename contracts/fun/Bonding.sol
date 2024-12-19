@@ -15,6 +15,8 @@ import "../interface/IFPair.sol";
 import "./FRouter.sol";
 import "../interface/IAgentToken.sol";
 import "../interface/IAgentFactory.sol";
+import "../pool/IUniswapV2Router02.sol";
+import "../pool/IUniswapV2Factory.sol";
 
 contract Bonding is
     Initializable,
@@ -22,29 +24,26 @@ contract Bonding is
     OwnableUpgradeable
 {
     using SafeERC20 for IERC20;
-
-    uint256 private taxSwapThresholdBasisPoints;
-    uint256 private projectBuyTaxBasisPoints;
-    uint256 private projectSellTaxBasisPoints;
-    address private projectTaxRecipient;
-    address public tokenAdmin;
-
+    uint256 public constant K = 3_000_000_000_000;
     address public feeTo;
     FFactory public factory;
     FRouter public router;
     uint256 public initialSupply;
     uint256 public fee;
-    uint256 public constant K = 3_000_000_000_000;
     uint256 public assetRate;
     uint256 public gradThreshold;
     IAgentFactory public agentFactory;
-    address public uniswapRouter;
+    IUniswapV2Router02 public uniswapRouter;
     address public agentTokenImpl;
+    mapping(address => Token) public tokenInfo;
+    address[] public tokenInfos;
 
-    struct Profile {
-        address user;
-        address[] tokens;
-    }
+    address public tokenAdmin;
+    uint256 private taxSwapThresholdBasisPoints;
+    uint256 private projectBuyTaxBasisPoints;
+    uint256 private projectSellTaxBasisPoints;
+    address private projectTaxRecipient;
+
 
     struct Token {
         address creator;
@@ -64,23 +63,10 @@ contract Bonding is
     struct Data {
         address token;
         string name;
-        string _name;
         string ticker;
         uint256 supply;
-        uint256 price;
         uint256 marketCap;
-        uint256 liquidity;
-        uint256 volume;
-        uint256 volume24H;
-        uint256 prevPrice;
-        uint256 lastUpdated;
     }
-
-    mapping(address => Profile) public profile;
-    address[] public profiles;
-
-    mapping(address => Token) public tokenInfo;
-    address[] public tokenInfos;
 
     event Launched(address indexed token, address indexed pair);
     event Graduated(address indexed token, address indexed uniPair);
@@ -117,30 +103,9 @@ contract Bonding is
 
         agentFactory = IAgentFactory(agentFactory_);
         gradThreshold = gradThreshold_;
-        uniswapRouter = uniswapRouter_;
+        uniswapRouter = IUniswapV2Router02(uniswapRouter_);
         tokenAdmin = tokenAdmin_;
         agentTokenImpl = agentTokenImpl_;
-    }
-
-    function _createUserProfile(address _user) internal returns (bool) {
-        address[] memory _tokens;
-        Profile memory _profile = Profile({user: _user, tokens: _tokens});
-        profile[_user] = _profile;
-        profiles.push(_user);
-        return true;
-    }
-
-    function _checkIfProfileExists(address _user) internal view returns (bool) {
-        return profile[_user].user == _user;
-    }
-
-    function _approval(
-        address _spender,
-        address _token,
-        uint256 amount
-    ) internal returns (bool) {
-        IERC20(_token).forceApprove(_spender, amount);
-        return true;
     }
 
     function setInitialSupply(uint256 newSupply) public onlyOwner {
@@ -183,14 +148,6 @@ contract Bonding is
         projectBuyTaxBasisPoints = projectBuyTaxBasisPoints_;
         projectSellTaxBasisPoints = projectSellTaxBasisPoints_;
         projectTaxRecipient = projectTaxRecipient_;
-    }
-
-    function getUserTokens(
-        address account
-    ) public view returns (address[] memory) {
-        require(_checkIfProfileExists(account), "User Profile dose not exist.");
-        Profile memory _profile = profile[account];
-        return _profile.tokens;
     }
 
     function getTokenParm() public view returns (uint256, uint256, uint256, address) {
@@ -244,14 +201,11 @@ contract Bonding is
             _pair,
             address(this),
             projectTaxRecipient,
-            uniswapRouter,
             tokenAdmin
         );
         token.initialize(name, _ticker, tokenParams);
         uint256 supply = token.totalSupply();
-        bool approved = _approval(address(router), address(token), supply);
-        require(approved);
-
+        token.approve(address(router), supply);
         uint256 k = ((K * 10000) / assetRate);
         uint256 liquidity = (((k * 10000 ether) / supply) * 1 ether) / 10000;
 
@@ -260,16 +214,9 @@ contract Bonding is
         Data memory _data = Data({
             token: address(token),
             name: string.concat(_name, " by NetMind AI"),
-            _name: _name,
             ticker: _ticker,
             supply: supply,
-            price: supply / liquidity,
-            marketCap: liquidity,
-            liquidity: liquidity * 2,
-            volume: 0,
-            volume24H: 0,
-            prevPrice: supply / liquidity,
-            lastUpdated: block.timestamp
+            marketCap: liquidity
         });
         Token memory tmpToken = Token({
             creator: msg.sender,
@@ -282,143 +229,37 @@ contract Bonding is
             telegram: urls[1],
             youtube: urls[2],
             website: urls[3],
-            trading: true, // Can only be traded once creator made initial purchase
+            trading: true,
             tradingOnUniswap: false
         });
         tokenInfo[address(token)] = tmpToken;
         tokenInfos.push(address(token));
-
-        bool exists = _checkIfProfileExists(msg.sender);
-
-        if (exists) {
-            Profile storage _profile = profile[msg.sender];
-
-            _profile.tokens.push(address(token));
-        } else {
-            bool created = _createUserProfile(msg.sender);
-
-            if (created) {
-                Profile storage _profile = profile[msg.sender];
-
-                _profile.tokens.push(address(token));
-            }
-        }
         emit Launched(address(token), _pair);
 
         // Make initial purchase
         IERC20(assetToken).forceApprove(address(router), initialPurchase);
-        router.buy(initialPurchase, address(token), address(this));
-        token.transfer(msg.sender, token.balanceOf(address(this)));
+        router.buy(initialPurchase, address(token), msg.sender);
     }
 
     function sell(
         uint256 amountIn,
         address tokenAddress
-    ) public returns (bool) {
+    ) public{
         require(tokenInfo[tokenAddress].trading, "Token not trading");
-
-        address pairAddress = factory.getPair(
-            tokenAddress,
-            router.assetToken()
-        );
-
-        IFPair pair = IFPair(pairAddress);
-
-        (uint256 reserveA, uint256 reserveB) = pair.getReserves();
-
-        (uint256 amount0In, uint256 amount1Out) = router.sell(
-            amountIn,
-            tokenAddress,
-            msg.sender
-        );
-
-        uint256 newReserveA = reserveA + amount0In;
-        uint256 newReserveB = reserveB - amount1Out;
-        uint256 duration = block.timestamp -
-            tokenInfo[tokenAddress].data.lastUpdated;
-
-        uint256 liquidity = newReserveB * 2;
-        uint256 mCap = (tokenInfo[tokenAddress].data.supply * newReserveB) /
-            newReserveA;
-        uint256 price = newReserveA / newReserveB;
-        uint256 volume = duration > 86400
-            ? amount1Out
-            : tokenInfo[tokenAddress].data.volume24H + amount1Out;
-        uint256 prevPrice = duration > 86400
-            ? tokenInfo[tokenAddress].data.price
-            : tokenInfo[tokenAddress].data.prevPrice;
-
-        tokenInfo[tokenAddress].data.price = price;
-        tokenInfo[tokenAddress].data.marketCap = mCap;
-        tokenInfo[tokenAddress].data.liquidity = liquidity;
-        tokenInfo[tokenAddress].data.volume =
-            tokenInfo[tokenAddress].data.volume +
-            amount1Out;
-        tokenInfo[tokenAddress].data.volume24H = volume;
-        tokenInfo[tokenAddress].data.prevPrice = prevPrice;
-
-        if (duration > 86400) {
-            tokenInfo[tokenAddress].data.lastUpdated = block.timestamp;
-        }
-
-        return true;
+        router.sell(amountIn, tokenAddress, msg.sender );
     }
 
     function buy(
         uint256 amountIn,
         address tokenAddress
-    ) public returns (bool) {
+    ) public{
         require(tokenInfo[tokenAddress].trading, "Token not trading");
-
-        address pairAddress = factory.getPair(
-            tokenAddress,
-            router.assetToken()
-        );
-
-        IFPair pair = IFPair(pairAddress);
-
-        (uint256 reserveA, uint256 reserveB) = pair.getReserves();
-
-        (uint256 amount1In, uint256 amount0Out) = router.buy(
-            amountIn,
-            tokenAddress,
-            msg.sender
-        );
-
-        uint256 newReserveA = reserveA - amount0Out;
-        uint256 newReserveB = reserveB + amount1In;
-        uint256 duration = block.timestamp -
-            tokenInfo[tokenAddress].data.lastUpdated;
-
-        uint256 liquidity = newReserveB * 2;
-        uint256 mCap = (tokenInfo[tokenAddress].data.supply * newReserveB) /
-            newReserveA;
-        uint256 price = newReserveA / newReserveB;
-        uint256 volume = duration > 86400
-            ? amount1In
-            : tokenInfo[tokenAddress].data.volume24H + amount1In;
-        uint256 _price = duration > 86400
-            ? tokenInfo[tokenAddress].data.price
-            : tokenInfo[tokenAddress].data.prevPrice;
-
-        tokenInfo[tokenAddress].data.price = price;
-        tokenInfo[tokenAddress].data.marketCap = mCap;
-        tokenInfo[tokenAddress].data.liquidity = liquidity;
-        tokenInfo[tokenAddress].data.volume =
-            tokenInfo[tokenAddress].data.volume +
-            amount1In;
-        tokenInfo[tokenAddress].data.volume24H = volume;
-        tokenInfo[tokenAddress].data.prevPrice = _price;
-
-        if (duration > 86400) {
-            tokenInfo[tokenAddress].data.lastUpdated = block.timestamp;
-        }
-
-        if (newReserveA <= gradThreshold && tokenInfo[tokenAddress].trading) {
+        router.buy(amountIn, tokenAddress, msg.sender );
+        address pairAddress = factory.getPair(tokenAddress, router.assetToken());
+        (uint256 reserveA, ) = IFPair(pairAddress).getReserves();
+        if (reserveA <= gradThreshold && tokenInfo[tokenAddress].trading) {
             _openTradingOnUniswap(tokenAddress);
         }
-
-        return true;
     }
 
     function _openTradingOnUniswap(address tokenAddress) private {
@@ -433,26 +274,36 @@ contract Bonding is
         _token.trading = false;
         _token.tradingOnUniswap = true;
         address assetToken = router.assetToken();
-        // Transfer asset tokens to bonding contract
-        address pairAddress = factory.getPair(
-            tokenAddress,
-            assetToken
-        );
-
-        IFPair pair = IFPair(pairAddress);
-
-        uint256 assetBalance = pair.assetBalance();
-        uint256 tokenBalance = pair.balance();
-
         router.graduate(tokenAddress);
-        token_.createPair();
-        address lp = token_.liquidityPools()[0];
-        IERC20(assetToken).transfer(tokenAddress, assetBalance);
-        token_.transfer(tokenAddress, tokenBalance);
-        token_.addInitialLiquidity(address(this));
+        address lp = _addInitialLiquidity(token_, IERC20(assetToken));
         agentFactory.graduate(address(token_), lp);
         emit Graduated(address(token_), lp);
     }
 
+    function _addInitialLiquidity(IAgentToken token_, IERC20 _assetToken) internal returns(address){
+        address uniswapV2Pair_ = IUniswapV2Factory(uniswapRouter.factory()).createPair(
+            address(token_),
+            address(_assetToken)
+        );
+        token_.addLiquidityPool(uniswapV2Pair_);
+
+        token_.approve(address(uniswapRouter), type(uint256).max);
+        _assetToken.approve(address(uniswapRouter), type(uint256).max);
+        // Add the liquidity:
+        (, , uint256 lpTokens) = uniswapRouter
+            .addLiquidity(
+            address(token_),
+            address(_assetToken),
+            token_.balanceOf(address(this)),
+            _assetToken.balanceOf(address(this)),
+            0,
+            0,
+            address(this),
+            block.timestamp
+        );
+        token_.setTokenSta();
+        IERC20(uniswapV2Pair_).transfer(address(this), lpTokens);
+        return uniswapV2Pair_;
+    }
 
 }

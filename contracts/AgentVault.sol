@@ -18,7 +18,7 @@ contract AgentVault is Ownable, IERC721Receiver{
         emit OutVault(token, to, tokenId);
     }
 
-    function onERC721Received(address operator, address from, uint256 tokenId, bytes memory data) public override pure returns (bytes4){
+    function onERC721Received(address operator, address from, uint256 tokenId, bytes memory data) public override view returns (bytes4){
         require(operator != address(0) && from != address(this) && tokenId != 0 && data.length >= 0, "AgentVault: invalid transfer");
         return this.onERC721Received.selector;
     }
