@@ -238,7 +238,8 @@ contract Bonding is
 
         // Make initial purchase
         IERC20(assetToken).forceApprove(address(router), initialPurchase);
-        router.buy(initialPurchase, address(token), msg.sender);
+        router.buy(initialPurchase, address(token), address(this));
+        token.transfer(msg.sender, token.balanceOf(address(this)));
     }
 
     function sell(
