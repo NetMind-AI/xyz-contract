@@ -32,12 +32,16 @@ contract AgentFactory is
         string  agentURI;            // Agent NFT tokenURI
         address fundPair;            // Internal Pair
         address dexPair;             // Public Pair
+        string  agentEID;            // Agent exist instance id
     }
 
     mapping(uint256 => Application) private _applications;
     mapping(address => uint256) private _applicationIds;
+    mapping(bytes32 => bool) private _agentEIDs;
 
-    event NewApplication(uint256 id, string name, address token);
+
+
+    event NewApplication(uint256 agentId, string name, address token, string sgentEID);
     event Graduate(uint256 id, address newDexPair);
 
     modifier onlyBonding() {
@@ -63,11 +67,22 @@ contract AgentFactory is
         agentVault = agentVault_;
     }
 
+    function _registerAgentEID(string memory agentEID) internal  {
+        bytes32 hash = keccak256(abi.encodePacked(agentEID));
+        if (hash != keccak256(abi.encodePacked(""))){
+            require(!_agentEIDs[hash], "Agent EID already registered");
+            _agentEIDs[hash] = true;
+        }
+            
+    }
+
     function newApplication(
         string memory name,
+        string memory agentEID,
         address token,
         address fundPair
     ) public onlyBonding {
+        _registerAgentEID(agentEID);
         uint256 id = ++_nextId;
 
         //Mint Agent NFT
@@ -79,14 +94,15 @@ contract AgentFactory is
             token,
             tokenURI,
             fundPair,
-            address(0)
+            address(0),
+            agentEID
         );
 
         _applications[id] = application;
         _applicationIds[token] = id;
 
         allTokens.push(token);
-        emit NewApplication(id, name, token);
+        emit NewApplication(id, name, token, agentEID);
     }
 
     function graduate(address token, address dexPair) public onlyBonding{
