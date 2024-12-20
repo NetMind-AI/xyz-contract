@@ -26,7 +26,6 @@ module.exports = {
     },
     bscTestnet: {
       url: process.env.RPC_URL,
-      gasPrice: 1000000000,
       accounts: [process.env.PRIVATE_KEY],
     },
 

@@ -15,6 +15,7 @@ import "../interface/IFPair.sol";
 import "./FRouter.sol";
 import "../interface/IAgentToken.sol";
 import "../interface/IAgentFactory.sol";
+import "../interface/IStakeVault.sol";
 import "../pool/IUniswapV2Router02.sol";
 import "../pool/IUniswapV2Factory.sol";
 
@@ -43,6 +44,8 @@ contract Bonding is
     uint256 private projectBuyTaxBasisPoints;
     uint256 private projectSellTaxBasisPoints;
     address private projectTaxRecipient;
+    address public stakeVaultImpl;
+    mapping(address => address) public tokenStake;
 
 
     struct Token {
@@ -87,6 +90,7 @@ contract Bonding is
         address uniswapRouter_,
         address tokenAdmin_,
         address agentTokenImpl_,
+        address stakeVaultImpl_,
         uint256 gradThreshold_
     ) external initializer {
         __Ownable_init(msg.sender);
@@ -106,6 +110,7 @@ contract Bonding is
         uniswapRouter = IUniswapV2Router02(uniswapRouter_);
         tokenAdmin = tokenAdmin_;
         agentTokenImpl = agentTokenImpl_;
+        stakeVaultImpl = stakeVaultImpl_;
     }
 
     function setInitialSupply(uint256 newSupply) public onlyOwner {
@@ -120,13 +125,13 @@ contract Bonding is
         agentTokenImpl = newAgentTokenImpl;
     }
 
+    function setStakeVaultImpl(address newStakeVaultImpl) public onlyOwner {
+        stakeVaultImpl = newStakeVaultImpl;
+    }
+
     function setFee(uint256 newFee, address newFeeTo) public onlyOwner {
         fee = newFee;
         feeTo = newFeeTo;
-    }
-
-    function setAgentFactory(address agentFactory_) public onlyOwner {
-        agentFactory = IAgentFactory(agentFactory_);
     }
 
     function setAssetRate(uint256 newRate) public onlyOwner {
@@ -148,6 +153,21 @@ contract Bonding is
         projectBuyTaxBasisPoints = projectBuyTaxBasisPoints_;
         projectSellTaxBasisPoints = projectSellTaxBasisPoints_;
         projectTaxRecipient = projectTaxRecipient_;
+    }
+
+    function withdraw(address token, address to) public onlyOwner {
+        require(tokenStake[token] != address(0), "token err");
+        IStakeVault(tokenStake[token]).withdraw(to);
+    }
+
+    function setLockPeriod(address token, uint256 lockPeriod_) public onlyOwner {
+        require(tokenStake[token] != address(0), "token err");
+        IStakeVault(tokenStake[token]).setLockPeriod(lockPeriod_);
+    }
+
+    function burn(address token) public onlyOwner {
+        require(tokenStake[token] != address(0), "token err");
+        IStakeVault(tokenStake[token]).burn();
     }
 
     function getTokenParm() public view returns (uint256, uint256, uint256, address) {
@@ -303,7 +323,10 @@ contract Bonding is
             block.timestamp
         );
         token_.setTokenSta();
-        IERC20(uniswapV2Pair_).transfer(address(this), lpTokens);
+        IStakeVault stakeVault = IStakeVault(Clones.clone(stakeVaultImpl));
+        tokenStake[address(token_)] = address(stakeVault);
+        IERC20(uniswapV2Pair_).approve(address(stakeVault), lpTokens);
+        stakeVault.initialize(uniswapV2Pair_, lpTokens);
         return uniswapV2Pair_;
     }
 

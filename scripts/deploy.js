@@ -21,13 +21,14 @@ async function exec() {
     let deployer =await getSingerAddr(0);
     let ProxyAdmin = await deploy('ProxyAdmin',0,'ProxyAdmin')
 
-    let AgentNFT = await deploy('AgentNFT',0,'NetmindAgentNFT', deployer.address, {file:"AgentNFT"})
     let AgentVault = await deploy('AgentVault',0,'AgentVault', deployer.address, {file:"AgentVault"})
     let AgentFactory = await deploy('AgentFactory',0,'AgentFactory')
     let AgentFactoryProxy = await deploy('AgentFactoryProxy',0,'TransparentUpgradeableProxy', AgentFactory.target, ProxyAdmin.target, "0x")
     AgentFactory = await getContract(0,'AgentFactory', AgentFactoryProxy.target.toString())
+    let AgentNFT = await deploy('AgentNFT',0,'NetmindAgentNFT', AgentFactory.target, {file:"AgentNFT"})
 
     let AgentToken = await deploy('AgentToken',0,'AgentToken')
+    let StakeVault = await deploy('StakeVault',0,'StakeVault')
     let FFactory = await deploy('FFactory',0,'FFactory')
     let FFactoryProxy = await deploy('FFactoryProxy',0,'TransparentUpgradeableProxy', FFactory.target, ProxyAdmin.target, "0x")
     FFactory = await getContract(0,'FFactory', FFactoryProxy.target.toString())
@@ -58,6 +59,7 @@ async function exec() {
         process.env.UNISWAP_ROUTER,
         process.env.TOKEN_ADMIN,
         AgentToken.target,
+        StakeVault.target,
         process.env.GRAD_THRESHOLD
     )
     await tx.wait();
@@ -76,10 +78,13 @@ async function exec() {
 }
 
 async function upgradeExec() {
-    let ProxyAdminAddr = "0xDD6C4c4966f4576FC5aC74b4A1Cf1096B3C30530";
+    let ProxyAdminAddr = "0xcd20cb980235680cbB42B29149Ac360C10ecBb42";
     let ProxyAdmin = await getContract(0,'ProxyAdmin', ProxyAdminAddr)
-    let AgentFactory = await deploy('AgentFactory',0,'AgentFactory')
-    await ProxyAdmin.upgrade("0x00DE127db8b9E65Df5C0ca6931f001Cb6A0AFAD2", AgentFactory.target)
+    let Bonding = await deploy('Bonding',0,'Bonding')
+    let StakeVault = await deploy('StakeVault',0,'StakeVault')
+    await ProxyAdmin.upgrade("0x987906dA56218D3aFAF3BC0F878724B015Fdf406", Bonding.target)
+    Bonding = await getContract(0,'Bonding', "0x987906dA56218D3aFAF3BC0F878724B015Fdf406")
+    await Bonding.setStakeVaultImpl(StakeVault.target)
 }
 
 // We recommend this pattern to be able to use async/await everywhere
