@@ -162,6 +162,7 @@ contract Bonding is
     function launch(
         string memory _name,
         string memory _ticker,
+        string memory eid,
         string memory desc,
         string memory img,
         string[4] memory urls,
@@ -189,6 +190,7 @@ contract Bonding is
         string memory name = string.concat(_name, " by NetMind XYZ");
         agentFactory.newApplication(
             name,
+            eid,
             address(token),
             _pair
         );
