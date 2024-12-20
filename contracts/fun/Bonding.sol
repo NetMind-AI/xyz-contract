@@ -69,6 +69,7 @@ contract Bonding is
         string ticker;
         uint256 supply;
         uint256 marketCap;
+        uint256 price;
     }
 
     event Launched(address indexed token, address indexed pair);
@@ -238,7 +239,8 @@ contract Bonding is
             name: string.concat(_name, " by NetMind AI"),
             ticker: _ticker,
             supply: supply,
-            marketCap: liquidity
+            marketCap: liquidity,
+            price: IFPair(_pair).priceBLast()
         });
         Token memory tmpToken = Token({
             creator: msg.sender,
@@ -270,6 +272,8 @@ contract Bonding is
     ) public{
         require(tokenInfo[tokenAddress].trading, "Token not trading");
         router.sell(amountIn, tokenAddress, msg.sender );
+        address pairAddress = factory.getPair(tokenAddress, router.assetToken());
+        tokenInfo[tokenAddress].data.price = IFPair(pairAddress).priceBLast();
     }
 
     function buy(
@@ -280,6 +284,7 @@ contract Bonding is
         router.buy(amountIn, tokenAddress, msg.sender );
         address pairAddress = factory.getPair(tokenAddress, router.assetToken());
         (uint256 reserveA, ) = IFPair(pairAddress).getReserves();
+        tokenInfo[tokenAddress].data.price = IFPair(pairAddress).priceBLast();
         if (reserveA <= gradThreshold && tokenInfo[tokenAddress].trading) {
             _openTradingOnUniswap(tokenAddress);
         }
