@@ -2,7 +2,7 @@
 pragma solidity ^0.8.20;
 
 interface IFPair {
-    function priceBLast() public view returns (uint256);
+    function priceBLast() external view returns (uint256);
 
     function getReserves() external view returns (uint256, uint256);
 
