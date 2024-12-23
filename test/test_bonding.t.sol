@@ -15,8 +15,8 @@ contract BondingTest is Test {
 
     function setUp() public {
         vm.createSelectFork("bscTestnet",
-            46566410);
-        bonding = Bonding(0xb1D6C89c53A3454d73535f1ad0c96Bd87b6b343c);
+            46652606);
+        bonding = Bonding(0x987906dA56218D3aFAF3BC0F878724B015Fdf406);
         assetToken = IERC20(0xeE065D420621dFd98a9e5787262716143F9F60A7);
     }
 
@@ -37,12 +37,17 @@ contract BondingTest is Test {
         launch();
     }
 
+    function test_withdraw() public {
+        vm.prank(owner);
+        bonding.withdraw(0x1e99f6cf97df79503015e9565b8ccFca4b7dc670, 0x72BDA02E234126372586Cc356441B5598C84D424);
+    }
+
     function test_sell() public {
         launch();
         IERC20 token = IERC20(bonding.tokenInfos(0));
         uint256 amount = 200 *10**18;
         vm.prank(owner);
-        address fRouter = 0xd466efDfE7f35cAF0f6352D39330d09DA7dE03D6;
+        address fRouter = 0x4939EEB6d43f909930FC6826Cb1AEC44FB0761Ef;
         token.approve(fRouter, amount);
         vm.prank(owner);
         bonding.sell(amount, address(token));
@@ -53,7 +58,7 @@ contract BondingTest is Test {
         IERC20 token = IERC20(bonding.tokenInfos(0));
         uint256 amount = 70000 *10**18;
         vm.prank(owner);
-        address fRouter = 0xd466efDfE7f35cAF0f6352D39330d09DA7dE03D6;
+        address fRouter = 0x4939EEB6d43f909930FC6826Cb1AEC44FB0761Ef;
         assetToken.approve(fRouter, amount);
         vm.prank(owner);
         bonding.buy(amount, address(token));
