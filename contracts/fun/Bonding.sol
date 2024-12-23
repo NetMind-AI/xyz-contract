@@ -163,10 +163,12 @@ contract Bonding is
         string memory _name,
         string memory _ticker,
         string memory eid,
+        string memory model,
         string memory desc,
         string memory img,
         string[4] memory urls,
-        uint256 purchaseAmount
+        uint256 purchaseAmount,
+        bool thinkingFlow
     ) public nonReentrant {
         require(
             purchaseAmount > fee,
@@ -191,6 +193,8 @@ contract Bonding is
         agentFactory.newApplication(
             name,
             eid,
+            model,
+            thinkingFlow,
             address(token),
             _pair
         );

@@ -33,6 +33,8 @@ contract AgentFactory is
         address fundPair;            // Internal Pair
         address dexPair;             // Public Pair
         string  agentEID;            // Agent exist instance id
+        string  agentModel;          // Agent Model
+        bool    thinkingFlow;        // Thinking flow open or not
     }
 
     mapping(uint256 => Application) private _applications;
@@ -79,6 +81,8 @@ contract AgentFactory is
     function newApplication(
         string memory name,
         string memory agentEID,
+        string memory agentModel,
+        bool thinkingFlow,
         address token,
         address fundPair
     ) public onlyBonding {
@@ -95,7 +99,9 @@ contract AgentFactory is
             tokenURI,
             fundPair,
             address(0),
-            agentEID
+            agentEID,
+            agentModel,
+            thinkingFlow
         );
 
         _applications[id] = application;
