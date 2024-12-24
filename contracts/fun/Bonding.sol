@@ -16,8 +16,8 @@ import "./FRouter.sol";
 import "../interface/IAgentToken.sol";
 import "../interface/IAgentFactory.sol";
 import "../interface/IStakeVault.sol";
-import "../pool/IUniswapV2Router02.sol";
-import "../pool/IUniswapV2Factory.sol";
+import "../interface/IUniswapV2Router02.sol";
+import "../interface/IUniswapV2Factory.sol";
 
 contract Bonding is
     Initializable,
