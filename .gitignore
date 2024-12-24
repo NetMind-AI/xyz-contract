@@ -10,6 +10,7 @@ typechain-types
 # Hardhat files
 forge-cache
 cache
+contracts/@openzeppelin
 artifacts
 param
 log

@@ -156,21 +156,6 @@ contract Bonding is
         projectTaxRecipient = projectTaxRecipient_;
     }
 
-    function withdraw(address token, address to) public onlyOwner {
-        require(tokenStake[token] != address(0), "token err");
-        IStakeVault(tokenStake[token]).withdraw(to);
-    }
-
-    function setLockPeriod(address token, uint256 lockPeriod_) public onlyOwner {
-        require(tokenStake[token] != address(0), "token err");
-        IStakeVault(tokenStake[token]).setLockPeriod(lockPeriod_);
-    }
-
-    function burn(address token) public onlyOwner {
-        require(tokenStake[token] != address(0), "token err");
-        IStakeVault(tokenStake[token]).burn();
-    }
-
     function getTokenParm() public view returns (uint256, uint256, uint256, address) {
         return (
             taxSwapThresholdBasisPoints,

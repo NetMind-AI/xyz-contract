@@ -54,7 +54,7 @@ contract Management is IManagement{
     }
 
     constructor(address[] memory _nodeAddrs) {
-        // require( _nodeAddrs.length> 4,"less than 5");
+        require( _nodeAddrs.length> 4,"less than 5");
         for (uint256 i = 0; i< _nodeAddrs.length; i++){
             addNodeAddr(_nodeAddrs[i]);
         }
