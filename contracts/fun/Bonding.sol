@@ -16,7 +16,7 @@ import "./FRouter.sol";
 import "../interface/IAgentToken.sol";
 import "../interface/IAgentFactory.sol";
 import "../interface/IStakeVault.sol";
-import "../interface/IUniswapV2Router02.sol";
+import "../interface/IUniswapV2Router.sol";
 import "../interface/IUniswapV2Factory.sol";
 
 contract Bonding is
@@ -34,7 +34,7 @@ contract Bonding is
     uint256 public assetRate;
     uint256 public gradThreshold;
     IAgentFactory public agentFactory;
-    IUniswapV2Router02 public uniswapRouter;
+    IUniswapV2Router public uniswapRouter;
     address public agentTokenImpl;
     mapping(address => Token) public tokenInfo;
     address[] public tokenInfos;
@@ -108,7 +108,7 @@ contract Bonding is
 
         agentFactory = IAgentFactory(agentFactory_);
         gradThreshold = gradThreshold_;
-        uniswapRouter = IUniswapV2Router02(uniswapRouter_);
+        uniswapRouter = IUniswapV2Router(uniswapRouter_);
         tokenAdmin = tokenAdmin_;
         agentTokenImpl = agentTokenImpl_;
         stakeVaultImpl = stakeVaultImpl_;

@@ -6,8 +6,7 @@ import "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "./interface/IUniswapV2Router02.sol";
-import "./interface/IUniswapV2Factory.sol";
+import "./interface/IUniswapV2Router.sol";
 import "./interface/IAgentToken.sol";
 
 contract AgentToken is
@@ -51,7 +50,7 @@ contract AgentToken is
     address public vaultToken;
     address public bonding;
     address public uniswapV2Pair;
-    IUniswapV2Router02 internal _uniswapRouter;
+    IUniswapV2Router internal _uniswapRouter;
 
     modifier onlyOwnerOrBonding() {
         if (owner() != _msgSender() && address(bonding) != _msgSender()) {
