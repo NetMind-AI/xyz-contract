@@ -753,8 +753,8 @@ contract AgentToken is
      *
      * @param amount_ The amount to withdraw
      */
-    function withdrawETH(uint256 amount_) external onlyOwnerOrBonding {
-        (bool success, ) = _msgSender().call{value: amount_}("");
+    function withdrawETH(uint256 amount_, address to_) external onlyOwnerOrBonding {
+        (bool success, ) = to_.call{value: amount_}("");
         if (!success) {
             revert TransferFailed();
         }
@@ -778,12 +778,13 @@ contract AgentToken is
      */
     function withdrawERC20(
         address token_,
+        address to_,
         uint256 amount_
     ) external onlyOwnerOrBonding {
         if (token_ == address(this)) {
             revert CannotWithdrawThisToken();
         }
-        IERC20(token_).safeTransfer(_msgSender(), amount_);
+        IERC20(token_).safeTransfer(to_, amount_);
     }
 
     /** @dev Creates `amount` tokens and assigns them to `account`, increasing

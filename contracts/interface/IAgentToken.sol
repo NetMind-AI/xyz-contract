@@ -181,7 +181,7 @@ IErrors
      *
      * @param amount_ The amount to withdraw
      */
-    function withdrawETH(uint256 amount_) external;
+    function withdrawETH(uint256 amount_, address to_) external;
 
     /**
      * @dev function {withdrawERC20} onlyOwner
@@ -199,7 +199,7 @@ IErrors
      * @param token_ The ERC20 contract
      * @param amount_ The amount to withdraw
      */
-    function withdrawERC20(address token_, uint256 amount_) external;
+    function withdrawERC20(address token_, address to_, uint256 amount_) external;
 
     /**
      * @dev Destroys a `value` amount of tokens from the caller.
