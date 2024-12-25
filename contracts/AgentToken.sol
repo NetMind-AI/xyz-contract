@@ -50,7 +50,7 @@ contract AgentToken is
     address public vaultToken;
     address public bonding;
     address public uniswapV2Pair;
-    IUniswapV2Router internal _uniswapRouter;
+    IUniswapV2Router public uniswapRouter;
 
     modifier onlyOwnerOrBonding() {
         if (owner() != _msgSender() && address(bonding) != _msgSender()) {
@@ -78,6 +78,7 @@ contract AgentToken is
         __Ownable_init(tokenParams.admin);
         _mint(_msgSender(), tokenParams.supply);
         vaultToken = tokenParams.vaultToken;
+        uniswapRouter = IUniswapV2Router(tokenParams.uniswapRouter);
 
         fPair = tokenParams.fPair;
         bonding = tokenParams.bonding;
@@ -648,8 +649,8 @@ contract AgentToken is
         return (taxBalance_ >= swapThresholdInTokens_ &&
             !_autoSwapInProgress &&
             !isLiquidityPool(from_) &&
-            from_ != address(_uniswapRouter) &&
-            to_ != address(_uniswapRouter));
+            from_ != address(uniswapRouter) &&
+            to_ != address(uniswapRouter));
     }
 
     /**
@@ -664,10 +665,10 @@ contract AgentToken is
         address[] memory path = new address[](2);
         path[0] = address(this);
         path[1] = vaultToken;
-
+        _approve(address(this), address(uniswapRouter), swapBalance_);
         // Wrap external calls in try / catch to handle errors
         try
-            _uniswapRouter
+            uniswapRouter
                 .swapExactTokensForTokensSupportingFeeOnTransferTokens(
                     swapBalance_,
                     0,

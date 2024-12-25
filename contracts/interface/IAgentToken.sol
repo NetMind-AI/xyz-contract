@@ -21,6 +21,7 @@ IErrors
         address bonding;
         address projectTaxRecipient;
         address admin;
+        address uniswapRouter;
     }
 
     event AutoSwapThresholdUpdated(uint256 oldThreshold, uint256 newThreshold);

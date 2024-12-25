@@ -213,7 +213,8 @@ contract Bonding is
             _pair,
             address(this),
             projectTaxRecipient,
-            tokenAdmin
+            tokenAdmin,
+            address(uniswapRouter)
         );
         token.initialize(name, _ticker, tokenParams);
         uint256 supply = token.totalSupply();
