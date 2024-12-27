@@ -258,20 +258,24 @@ contract Bonding is
 
     function sell(
         uint256 amountIn,
+        uint256 amountOutMin,
         address tokenAddress
     ) public{
         require(tokenInfo[tokenAddress].trading, "Token not trading");
-        router.sell(amountIn, tokenAddress, msg.sender );
+        (, uint256 amountOut) = router.sell(amountIn, tokenAddress, msg.sender );
+        require(amountOut >= amountOutMin, "amountOutMin error");
         address pairAddress = factory.getPair(tokenAddress, router.assetToken());
         tokenInfo[tokenAddress].data.price = IFPair(pairAddress).priceBLast();
     }
 
     function buy(
         uint256 amountIn,
+        uint256 amountOutMin,
         address tokenAddress
     ) public{
         require(tokenInfo[tokenAddress].trading, "Token not trading");
-        router.buy(amountIn, tokenAddress, msg.sender );
+        (, uint256 amountOut) = router.buy(amountIn, tokenAddress, msg.sender );
+        require(amountOut >= amountOutMin, "amountOutMin error");
         address pairAddress = factory.getPair(tokenAddress, router.assetToken());
         (uint256 reserveA, ) = IFPair(pairAddress).getReserves();
         tokenInfo[tokenAddress].data.price = IFPair(pairAddress).priceBLast();
