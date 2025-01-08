@@ -41,7 +41,8 @@ contract FFactory is Initializable, AccessControlUpgradeable, ReentrancyGuardUpg
         __AccessControl_init();
         __ReentrancyGuard_init();
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
-
+        require(taxVault_ != address(0), "address err");
+        require(sellTax_ <= 10 && buyTax_ <= 10, "tax error");
         taxVault = taxVault_;
         buyTax = buyTax_;
         sellTax = sellTax_;
@@ -95,13 +96,14 @@ contract FFactory is Initializable, AccessControlUpgradeable, ReentrancyGuardUpg
         uint256 sellTax_
     ) public onlyRole(ADMIN_ROLE) {
         require(newVault_ != address(0), "Zero addresses are not allowed.");
-
+        require(sellTax_ <= 10 && buyTax_ <= 10, "tax error");
         taxVault = newVault_;
         buyTax = buyTax_;
         sellTax = sellTax_;
     }
 
     function setRouter(address router_) public onlyRole(ADMIN_ROLE) {
+        require(router_ != address(0), "address err");
         router = router_;
     }
 }

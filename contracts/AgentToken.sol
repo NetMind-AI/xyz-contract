@@ -219,7 +219,7 @@ contract AgentToken is
      * @param swapThresholdBasisPoints_ New swap threshold in basis points
      */
     function setSwapThresholdBasisPoints(
-        uint16 swapThresholdBasisPoints_
+        uint256 swapThresholdBasisPoints_
     ) external onlyOwnerOrBonding {
         uint256 oldswapThresholdBasisPoints = swapThresholdBasisPoints;
         swapThresholdBasisPoints = swapThresholdBasisPoints_;
@@ -241,6 +241,12 @@ contract AgentToken is
         uint16 newProjectBuyTaxBasisPoints_,
         uint16 newProjectSellTaxBasisPoints_
     ) external onlyOwnerOrBonding {
+        if (newProjectBuyTaxBasisPoints_ > 1000) {
+            revert ProjectBuyTaxExceedsLimit();
+        }
+        if (newProjectSellTaxBasisPoints_ > 1000) {
+            revert ProjectSellTaxExceedsLimit();
+        }
         uint16 oldBuyTaxBasisPoints = projectBuyTaxBasisPoints;
         uint16 oldSellTaxBasisPoints = projectSellTaxBasisPoints;
 
@@ -605,9 +611,8 @@ contract AgentToken is
             uint256 contractBalance = balanceOf(address(this));
             uint256 swapBalance = contractBalance;
 
-            uint256 swapThresholdInTokens = (_totalSupply *
-                swapThresholdBasisPoints) / BP_DENOM;
-
+            uint256 swapThresholdInTokens = (_totalSupply * swapThresholdBasisPoints) / BP_DENOM;
+            uint256 swapThresholdAmount = (_totalSupply * swapThresholdBasisPoints) * MAX_SWAP_THRESHOLD_MULTIPLE / BP_DENOM;
             if (
                 _eligibleForSwap(from_, to_, swapBalance, swapThresholdInTokens)
             ) {
@@ -615,12 +620,9 @@ contract AgentToken is
                 _autoSwapInProgress = true;
                 // Check if we need to reduce the amount of tokens for this swap:
                 if (
-                    swapBalance >
-                    swapThresholdInTokens * MAX_SWAP_THRESHOLD_MULTIPLE
+                    swapBalance > swapThresholdAmount
                 ) {
-                    swapBalance =
-                        swapThresholdInTokens *
-                        MAX_SWAP_THRESHOLD_MULTIPLE;
+                    swapBalance = swapThresholdAmount;
                 }
                 // Perform the auto swap to pair token
                 _swapTax(swapBalance, contractBalance);

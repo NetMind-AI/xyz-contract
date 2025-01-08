@@ -96,7 +96,8 @@ contract FPair is IFPair, ReentrancyGuard {
 
         IERC20 token = IERC20(_token);
 
-        token.forceApprove(_user, amount);
+        bool success = token.approve(_user, amount);
+        require(success, "Approval failed");
 
         return true;
     }

@@ -115,7 +115,7 @@ IErrors
      * @param swapThresholdBasisPoints_ New swap threshold in basis points
      */
     function setSwapThresholdBasisPoints(
-        uint16 swapThresholdBasisPoints_
+        uint256 swapThresholdBasisPoints_
     ) external;
 
     /**

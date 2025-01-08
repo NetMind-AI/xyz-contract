@@ -37,4 +37,8 @@ interface IErrors {
 
   error MintToZeroAddress(); //                             Cannot mint to the zero address.
 
+  error ProjectBuyTaxExceedsLimit();
+
+  error ProjectSellTaxExceedsLimit();
+
 }

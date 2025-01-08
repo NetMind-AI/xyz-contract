@@ -61,20 +61,19 @@ contract AgentFactory is
         address agentVault_
     ) public initializer {
         __Ownable_init(initialOwner);
-
+        require(bonding_ != address(0) && agentNFT_ != address(0) && agentVault_ != address(0), "address err");
         bonding = bonding_;
         agentNFT = agentNFT_;
         agentVault = agentVault_;
     }
 
     function _registerAgentEID(string memory agentEID) internal  {
+        require(bytes(agentEID).length > 0, "Agent EID cannot be empty");
         bytes32 hash = keccak256(abi.encodePacked(agentEID));
-        if (hash != keccak256(abi.encodePacked(""))){
-            require(!_agentEIDs[hash], "Agent EID already registered");
-            _agentEIDs[hash] = true;
-        }
-
+        require(!_agentEIDs[hash], "Agent EID already registered");
+        _agentEIDs[hash] = true;
     }
+
 
     function newApplication(
         string memory name,

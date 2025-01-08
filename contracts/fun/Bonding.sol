@@ -100,7 +100,8 @@ contract Bonding is
     ) external initializer {
         __Ownable_init(msg.sender);
         __ReentrancyGuard_init();
-
+        require(feeTo_ != address(0) && factory_ != address(0) && router_ != address(0) && agentFactory_ != address(0) &&
+        uniswapRouter_ != address(0) && tokenAdmin_ != address(0) && agentTokenImpl_ != address(0) && stakeVaultImpl_ != address(0), "address err");
         factory = FFactory(factory_);
         router = FRouter(router_);
 
@@ -127,15 +128,19 @@ contract Bonding is
     }
 
     function setAgentTokenImpl(address newAgentTokenImpl) public onlyOwner {
+        require(newAgentTokenImpl != address(0), "address err");
         agentTokenImpl = newAgentTokenImpl;
     }
 
     function setStakeVaultImpl(address newStakeVaultImpl) public onlyOwner {
+        require(newStakeVaultImpl != address(0), "address err");
         stakeVaultImpl = newStakeVaultImpl;
     }
 
     function setFee(uint256 newFee, address newFeeTo) public onlyOwner {
-        fee = newFee;
+        fee = (newFee * 1 ether) / 1000;
+        require(fee <= 1e22, "fee err");
+        require(newFeeTo != address(0), "address err");
         feeTo = newFeeTo;
     }
 
@@ -145,6 +150,7 @@ contract Bonding is
     }
 
     function setTokenAdmin(address newTokenAdmin) public onlyOwner {
+        require(newTokenAdmin != address(0), "address err");
         tokenAdmin = newTokenAdmin;
     }
 
@@ -184,9 +190,11 @@ contract Bonding is
         uint256 projectSellTaxBasisPoints_,
         address projectTaxRecipient_
     ) public onlyOwner {
+        require(projectBuyTaxBasisPoints_ <= 1000 && projectSellTaxBasisPoints_ <= 1000, "tax error");
         taxSwapThresholdBasisPoints = taxSwapThresholdBasisPoints_;
         projectBuyTaxBasisPoints = projectBuyTaxBasisPoints_;
         projectSellTaxBasisPoints = projectSellTaxBasisPoints_;
+        require(projectTaxRecipient_ != address(0), "address err");
         projectTaxRecipient = projectTaxRecipient_;
     }
 
@@ -250,7 +258,7 @@ contract Bonding is
         uint256 supply = token.totalSupply();
         token.approve(address(router), supply);
         uint256 k = ((K * 10000) / assetRate);
-        uint256 liquidity = (((k * 10000 ether) / supply) * 1 ether) / 10000;
+        uint256 liquidity = ((k * 10000 ether) * 1 ether / supply)  / 10000;
 
         router.addInitialLiquidity(address(token), supply, liquidity);
 
