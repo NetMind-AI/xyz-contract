@@ -74,6 +74,10 @@ contract Bonding is
 
     event Launched(address indexed token, address indexed pair);
     event Graduated(address indexed token, address indexed uniPair);
+    event Twitter(address indexed token, string twitter);
+    event Telegram(address indexed token, string telegram);
+    event Youtube(address indexed token, string youtube);
+    event Website(address indexed token, string website);
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -144,6 +148,36 @@ contract Bonding is
         tokenAdmin = newTokenAdmin;
     }
 
+    function setTokenMsg(
+        address token,
+        string memory twitter,
+        string memory telegram,
+        string memory youtube,
+        string memory website
+    ) public {
+        address creator = tokenInfo[token].creator;
+        if(bytes(twitter).length> 0 && auth(creator, bytes(tokenInfo[token].twitter).length)){
+            tokenInfo[token].twitter = twitter;
+            emit Twitter(token, twitter);
+        }
+        if(bytes(telegram).length > 0 && auth(creator, bytes(tokenInfo[token].telegram).length)){
+            tokenInfo[token].telegram = telegram;
+            emit Telegram(token, telegram);
+        }
+        if(bytes(youtube).length > 0 && auth(creator, bytes(tokenInfo[token].youtube).length)){
+            tokenInfo[token].youtube = youtube;
+            emit Youtube(token, youtube);
+        }
+        if(bytes(website).length > 0 && auth(creator, bytes(tokenInfo[token].website).length)){
+            tokenInfo[token].website = website;
+            emit Website(token, website);
+        }
+    }
+
+    function auth(address creator, uint256 len) internal view returns(bool){
+        return _msgSender() == owner() || (_msgSender() == creator && len == 0);
+    }
+
     function setTokenParm(
         uint256 taxSwapThresholdBasisPoints_,
         uint256 projectBuyTaxBasisPoints_,
@@ -169,12 +203,10 @@ contract Bonding is
         string memory _name,
         string memory _ticker,
         string memory eid,
-        string memory model,
         string memory desc,
         string memory img,
         string[4] memory urls,
-        uint256 purchaseAmount,
-        bool thinkingFlow
+        uint256 purchaseAmount
     ) public nonReentrant {
         require(
             purchaseAmount > fee,
@@ -199,8 +231,6 @@ contract Bonding is
         agentFactory.newApplication(
             name,
             eid,
-            model,
-            thinkingFlow,
             address(token),
             _pair
         );
@@ -249,6 +279,10 @@ contract Bonding is
         tokenInfo[address(token)] = tmpToken;
         tokenInfos.push(address(token));
         emit Launched(address(token), _pair);
+        if(bytes(urls[0]).length> 0)emit Twitter(address(token), urls[0]);
+        if(bytes(urls[1]).length > 0)emit Telegram(address(token), urls[1]);
+        if(bytes(urls[2]).length > 0)emit Youtube(address(token), urls[2]);
+        if(bytes(urls[3]).length > 0)emit Website(address(token), urls[3]);
 
         // Make initial purchase
         IERC20(assetToken).forceApprove(address(router), initialPurchase);

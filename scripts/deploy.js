@@ -13,13 +13,19 @@ async function main() {
     await createFile()
     var data=fs.readFileSync('./config/config.json','utf-8');
     configjson = JSON.parse(data.toString());
-    await upgradeExec()
+    await exec()
     saveAddr(addrList)
 }
 
 async function exec() {
     let deployer =await getSingerAddr(0);
     let ProxyAdmin = await deploy('ProxyAdmin',0,'ProxyAdmin')
+
+    let FeeReceive = await deploy('FeeReceive',0,'FeeReceive')
+    let FeeReceiveProxy = await deploy('FeeReceiveProxy',0,'TransparentUpgradeableProxy', FeeReceive.target, ProxyAdmin.target, "0x")
+    FeeReceive = await getContract(0,'FeeReceive', FeeReceiveProxy.target.toString())
+    let tx = await FeeReceive.init();
+    await tx.wait(3);
 
     let AgentVault = await deploy('AgentVault',0,'AgentVault', deployer.address, {file:"AgentVault"})
     let AgentFactory = await deploy('AgentFactory',0,'AgentFactory')
@@ -32,26 +38,28 @@ async function exec() {
     let FFactory = await deploy('FFactory',0,'FFactory')
     let FFactoryProxy = await deploy('FFactoryProxy',0,'TransparentUpgradeableProxy', FFactory.target, ProxyAdmin.target, "0x")
     FFactory = await getContract(0,'FFactory', FFactoryProxy.target.toString())
-    tx = await FFactory.initialize(process.env.TAX_VAULT, process.env.FACTORY_BUY_TAX, process.env.FACTORY_SELL_TAX);
-    await tx.wait();
-    await FFactory.grantRole(await FFactory.ADMIN_ROLE(), deployer.address);
+    tx = await FFactory.initialize(FeeReceive.target, process.env.FACTORY_BUY_TAX, process.env.FACTORY_SELL_TAX);
+    await tx.wait(3);
+    tx = await FFactory.grantRole(await FFactory.ADMIN_ROLE(), deployer.address);
+    await tx.wait(3);
 
     let FRouter = await deploy('FRouter',0,'FRouter')
     let FRouterProxy = await deploy('FRouterProxy',0,'TransparentUpgradeableProxy', FRouter.target, ProxyAdmin.target, "0x")
     FRouter = await getContract(0,'FRouter', FRouterProxy.target.toString())
     tx = await FRouter.initialize(FFactory.target, process.env.VAULT_TOKEN)
-    await tx.wait();
-    await FFactory.setRouter(FRouter.target);
+    await tx.wait(3);
+    tx = await FFactory.setRouter(FRouter.target);
+    await tx.wait(3);
 
     let Bonding = await deploy('Bonding',0,'Bonding')
     let BondingProxy = await deploy('BondingProxy',0,'TransparentUpgradeableProxy', Bonding.target, ProxyAdmin.target, "0x")
     Bonding = await getContract(0,'Bonding', BondingProxy.target.toString())
     tx = await AgentFactory.initialize(deployer.address, Bonding.target, AgentNFT.target, AgentVault.target);
-    await tx.wait();
+    await tx.wait(3);
     tx = await Bonding.initialize(
         FFactory.target,
         FRouter.target,
-        process.env.FEE_TO,
+        FeeReceive.target,
         process.env.FEE,
         ethers.parseEther(process.env.INITIAL_SUPPLY.toString()),
         process.env.ASSET_RATE,
@@ -62,29 +70,19 @@ async function exec() {
         StakeVault.target,
         process.env.GRAD_THRESHOLD
     )
-    await tx.wait();
+    await tx.wait(3);
     tx = await Bonding.setTokenParm(
       process.env.SWAP_THRESHOLD,
       process.env.BUY_TAX,
       process.env.SELL_TAX,
-      process.env.TAX_RECIPIENT_ADDR,
+      FeeReceive.target,
     );
-    await tx.wait();
+    await tx.wait(3);
     tx = await FFactory.grantRole(await FFactory.CREATOR_ROLE(), Bonding.target);
-    await tx.wait();
+    await tx.wait(3);
     tx = await FRouter.grantRole(await FRouter.EXECUTOR_ROLE(), Bonding.target);
-    await tx.wait();
+    await tx.wait(3);
     console.log(await Bonding.getTokenParm())
-}
-
-async function upgradeExec() {
-    let ProxyAdminAddr = "0xcd20cb980235680cbB42B29149Ac360C10ecBb42";
-    let ProxyAdmin = await getContract(0,'ProxyAdmin', ProxyAdminAddr)
-    let Bonding = await deploy('Bonding',0,'Bonding')
-    let StakeVault = await deploy('StakeVault',0,'StakeVault')
-    await ProxyAdmin.upgrade("0x987906dA56218D3aFAF3BC0F878724B015Fdf406", Bonding.target)
-    Bonding = await getContract(0,'Bonding', "0x987906dA56218D3aFAF3BC0F878724B015Fdf406")
-    await Bonding.setStakeVaultImpl(StakeVault.target)
 }
 
 // We recommend this pattern to be able to use async/await everywhere

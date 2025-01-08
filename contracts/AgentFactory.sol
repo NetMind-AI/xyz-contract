@@ -16,7 +16,7 @@ contract AgentFactory is
     OwnableUpgradeable
 {
     using SafeERC20 for IERC20;
-    
+
     uint256 private _nextId;          // ApplicationId
     address public gov;               // Gov contract, Dao or Management, not use
     address public bonding;           // Bonding contract
@@ -33,8 +33,6 @@ contract AgentFactory is
         address fundPair;            // Internal Pair
         address dexPair;             // Public Pair
         string  agentEID;            // Agent exist instance id
-        string  agentModel;          // Agent Model
-        bool    thinkingFlow;        // Thinking flow open or not
     }
 
     mapping(uint256 => Application) private _applications;
@@ -75,14 +73,12 @@ contract AgentFactory is
             require(!_agentEIDs[hash], "Agent EID already registered");
             _agentEIDs[hash] = true;
         }
-            
+
     }
 
     function newApplication(
         string memory name,
         string memory agentEID,
-        string memory agentModel,
-        bool thinkingFlow,
         address token,
         address fundPair
     ) public onlyBonding {
@@ -92,16 +88,14 @@ contract AgentFactory is
         //Mint Agent NFT
         uint256 tokenId = IAgentNFT(agentNFT).safeMint(agentVault);
         string memory tokenURI = IAgentNFT(agentNFT).tokenURI(tokenId);
-        
+
         Application memory application = Application(
             name,
             token,
             tokenURI,
             fundPair,
             address(0),
-            agentEID,
-            agentModel,
-            thinkingFlow
+            agentEID
         );
 
         _applications[id] = application;
