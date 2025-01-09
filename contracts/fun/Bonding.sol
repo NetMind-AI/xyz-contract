@@ -345,10 +345,16 @@ contract Bonding is
     }
 
     function _addInitialLiquidity(IAgentToken token_, IERC20 _assetToken) internal returns(address){
-        address uniswapV2Pair_ = IUniswapV2Factory(uniswapRouter.factory()).createPair(
+        address uniswapV2Pair_ = IUniswapV2Factory(uniswapRouter.factory()).getPair(
             address(token_),
             address(_assetToken)
         );
+        if (uniswapV2Pair_ == address(0)) {
+            uniswapV2Pair_ = IUniswapV2Factory(uniswapRouter.factory()).createPair(
+                address(token_),
+                address(_assetToken)
+            );
+        }
         token_.addLiquidityPool(uniswapV2Pair_);
 
         token_.approve(address(uniswapRouter), type(uint256).max);
