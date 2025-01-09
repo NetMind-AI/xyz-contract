@@ -49,7 +49,6 @@ contract AgentToken is
     address public fPair;
     address public vaultToken;
     address public bonding;
-    address public uniswapV2Pair;
     IUniswapV2Router public uniswapRouter;
 
     modifier onlyOwnerOrBonding() {
@@ -135,13 +134,7 @@ contract AgentToken is
      * @return bool The address is / isn't a liquidity pool
      */
     function isLiquidityPool(address queryAddress_) public view returns (bool) {
-        /** @dev We check the uniswapV2Pair address first as this is an immutable variable and therefore does not need
-         * to be fetched from storage, saving gas if this address IS the uniswapV2Pool. We also add this address
-         * to the enumerated set for ease of reference (for example it is returned in the getter), and it does
-         * not add gas to any other calls, that still complete in 0(1) time.
-         */
-        return (queryAddress_ == uniswapV2Pair ||
-            _liquidityPools.contains(queryAddress_));
+        return _liquidityPools.contains(queryAddress_);
     }
 
     /**
@@ -510,19 +503,6 @@ contract AgentToken is
         address to_,
         uint256 amount_
     ) internal view returns (uint256 fromBalance_) {
-        // This can't be a transfer to the liquidity pool before the funding date
-        // UNLESS the from address is this contract. This ensures that the initial
-        // LP funding transaction is from this contract using the supply of tokens
-        // designated for the LP pool, and therefore the initial price in the pool
-        // is being set as expected.
-        //
-        // This protects from, for example, tokens from a team minted supply being
-        // paired with ETH and added to the pool, setting the initial price, BEFORE
-        // the initial liquidity is added through this contract.
-        if (to_ == uniswapV2Pair && from_ != address(this) && fundedDate == 0) {
-            revert InitialLiquidityNotYetAdded();
-        }
-
         if (to_ != fPair && from_ != fPair && to_ != bonding && from_ != bonding && fundedDate == 0) {
             revert InvalidTransferTime();
         }
