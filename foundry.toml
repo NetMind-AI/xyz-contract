@@ -12,4 +12,4 @@ optimizer = true
 runs = 200
 via-ir = true
 
-rpc_endpoints = { bscTestnet = "https://bsc-testnet.nodereal.io/v1/9a8b33a8518947ee9635b30b603f47ad", bsc = "https://rpc.ankr.com/bsc"}
+rpc_endpoints = {baseSepolia="https://base-sepolia.gateway.tenderly.co", bscTestnet = "https://bsc-testnet.nodereal.io/v1/9a8b33a8518947ee9635b30b603f47ad", bsc = "https://rpc.ankr.com/bsc"}

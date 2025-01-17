@@ -15,9 +15,9 @@ import "../interface/IFPair.sol";
 import "./FRouter.sol";
 import "../interface/IAgentToken.sol";
 import "../interface/IAgentFactory.sol";
-import "../interface/IStakeVault.sol";
 import "../interface/IUniswapV2Router.sol";
 import "../interface/IUniswapV2Factory.sol";
+import "../interface/IGovernor.sol";
 
 contract Bonding is
     Initializable,
@@ -44,8 +44,16 @@ contract Bonding is
     uint256 private projectBuyTaxBasisPoints;
     uint256 private projectSellTaxBasisPoints;
     address private projectTaxRecipient;
-    address public stakeVaultImpl;
-    mapping(address => address) public tokenStake;
+    mapping(address => Msg) public tokenMsg;
+    address private governorTokenImpl;
+    address private governorImpl;
+    address private timelockControllerImpl;
+    address private defaultDelegatee;
+    uint256 private timelockDelay;
+    uint48 private votingDelay;
+    uint32 private votingPeriod;
+    uint256 private proposalThreshold;
+    uint256 private quorumNumeratorValue;
 
 
     struct Token {
@@ -59,6 +67,7 @@ contract Bonding is
         string telegram;
         string youtube;
         string website;
+        string keyHash;
         bool trading;
         bool tradingOnUniswap;
     }
@@ -72,12 +81,20 @@ contract Bonding is
         uint256 price;
     }
 
+    struct Msg {
+        address governorToken;
+        address governor;
+        address timelock;
+        address pair;
+    }
+
     event Launched(address indexed token, address indexed pair);
-    event Graduated(address indexed token, address indexed uniPair);
+    event Graduated(address indexed token, address indexed uniPair, address governorToken, address governor, address timelockController);
     event Twitter(address indexed token, string twitter);
     event Telegram(address indexed token, string telegram);
     event Youtube(address indexed token, string youtube);
     event Website(address indexed token, string website);
+    event KeyHash(address indexed token, string keyHash);
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -95,13 +112,17 @@ contract Bonding is
         address uniswapRouter_,
         address tokenAdmin_,
         address agentTokenImpl_,
-        address stakeVaultImpl_,
+        address governorTokenImpl_,
+        address governorImpl_,
+        address timelockControllerImpl_,
+        address defaultDelegatee_,
         uint256 gradThreshold_
     ) external initializer {
         __Ownable_init(msg.sender);
         __ReentrancyGuard_init();
         require(feeTo_ != address(0) && factory_ != address(0) && router_ != address(0) && agentFactory_ != address(0) &&
-        uniswapRouter_ != address(0) && tokenAdmin_ != address(0) && agentTokenImpl_ != address(0) && stakeVaultImpl_ != address(0), "address err");
+        uniswapRouter_ != address(0) && tokenAdmin_ != address(0) && agentTokenImpl_ != address(0) && defaultDelegatee_ != address(0) &&
+        governorTokenImpl_ != address(0) && governorImpl_ != address(0) && timelockControllerImpl_ != address(0), "address err");
         factory = FFactory(factory_);
         router = FRouter(router_);
 
@@ -116,11 +137,19 @@ contract Bonding is
         uniswapRouter = IUniswapV2Router(uniswapRouter_);
         tokenAdmin = tokenAdmin_;
         agentTokenImpl = agentTokenImpl_;
-        stakeVaultImpl = stakeVaultImpl_;
+        governorTokenImpl = governorTokenImpl_;
+        governorImpl = governorImpl_;
+        timelockControllerImpl = timelockControllerImpl_;
+        defaultDelegatee = defaultDelegatee_;
     }
 
     function setInitialSupply(uint256 newSupply) public onlyOwner {
         initialSupply = newSupply;
+    }
+
+    function setDefaultDelegatee(address newDelegatee) public onlyOwner {
+        require(newDelegatee != address(0), "address err");
+        defaultDelegatee = newDelegatee;
     }
 
     function setGradThreshold(uint256 newThreshold) public onlyOwner {
@@ -132,16 +161,35 @@ contract Bonding is
         agentTokenImpl = newAgentTokenImpl;
     }
 
-    function setStakeVaultImpl(address newStakeVaultImpl) public onlyOwner {
-        require(newStakeVaultImpl != address(0), "address err");
-        stakeVaultImpl = newStakeVaultImpl;
+    function setGovernorImpl(
+        address newGovernorTokenImpl,
+        address newGovernorImpl,
+        address newTimelockImpl
+    ) public onlyOwner {
+        if(newGovernorTokenImpl != address(0))governorTokenImpl = newGovernorTokenImpl;
+        if(newGovernorImpl != address(0))governorImpl = newGovernorImpl;
+        if(newTimelockImpl != address(0))timelockControllerImpl = newTimelockImpl;
+    }
+
+    function setGovernorParm(
+        uint256 newTimelockDelay,
+        uint48 newVotingDelay,
+        uint32 newVotingPeriod,
+        uint256 newProposalThreshold,
+        uint256 newQuorumNumerator
+    ) public onlyOwner {
+        require(newQuorumNumerator <100, "newQuorumNumerator err");
+        timelockDelay = newTimelockDelay;
+        votingDelay = newVotingDelay;
+        votingPeriod = newVotingPeriod;
+        proposalThreshold = newProposalThreshold;
+        quorumNumeratorValue = newQuorumNumerator;
     }
 
     function setFee(uint256 newFee, address newFeeTo) public onlyOwner {
         fee = (newFee * 1 ether) / 1000;
         require(fee <= 1e22, "fee err");
-        require(newFeeTo != address(0), "address err");
-        feeTo = newFeeTo;
+        if(newFeeTo != address(0))feeTo = newFeeTo;
     }
 
     function setAssetRate(uint256 newRate) public onlyOwner {
@@ -159,29 +207,50 @@ contract Bonding is
         string memory twitter,
         string memory telegram,
         string memory youtube,
-        string memory website
+        string memory website,
+        string memory keyHash
     ) public {
         address creator = tokenInfo[token].creator;
-        if(bytes(twitter).length> 0 && auth(creator, bytes(tokenInfo[token].twitter).length)){
+        if(bytes(twitter).length> 2 && auth(creator, token, bytes(tokenInfo[token].twitter).length)){
             tokenInfo[token].twitter = twitter;
             emit Twitter(token, twitter);
         }
-        if(bytes(telegram).length > 0 && auth(creator, bytes(tokenInfo[token].telegram).length)){
+        if(bytes(telegram).length > 2 && auth(creator, token, bytes(tokenInfo[token].telegram).length)){
             tokenInfo[token].telegram = telegram;
             emit Telegram(token, telegram);
         }
-        if(bytes(youtube).length > 0 && auth(creator, bytes(tokenInfo[token].youtube).length)){
+        if(bytes(youtube).length > 2 && auth(creator, token, bytes(tokenInfo[token].youtube).length)){
             tokenInfo[token].youtube = youtube;
             emit Youtube(token, youtube);
         }
-        if(bytes(website).length > 0 && auth(creator, bytes(tokenInfo[token].website).length)){
+        if(bytes(website).length > 2 && auth(creator, token, bytes(tokenInfo[token].website).length)){
             tokenInfo[token].website = website;
             emit Website(token, website);
         }
+        if(bytes(keyHash).length > 2 && auth(creator, token, bytes(tokenInfo[token].keyHash).length)){
+            tokenInfo[token].keyHash = keyHash;
+            emit KeyHash(token, keyHash);
+        }
     }
 
-    function auth(address creator, uint256 len) internal view returns(bool){
-        return _msgSender() == owner() || (_msgSender() == creator && len == 0);
+    function auth(address creator, address token, uint256 len) internal view returns(bool){
+        address sender = _msgSender();
+        return sender == tokenMsg[token].timelock || sender == owner() || (sender == creator && len <= 2);
+    }
+
+    function withdraw(address token, address to, uint256 amount) public onlyOwner {
+        require(tokenMsg[token].governorToken != address(0), "token err");
+        IGovernorToken governorToken = IGovernorToken(tokenMsg[token].governorToken);
+        uint256 balance = governorToken.balanceOf(address(this));
+        require(amount <= balance, "balance err");
+        if(amount == 0)amount = balance;
+        governorToken.withdraw(amount);
+        IERC20(tokenMsg[token].pair).transfer(to, amount);
+    }
+
+    function delegate(address token, address delegatee) public onlyOwner {
+        require(tokenMsg[token].governorToken != address(0) && delegatee != address(0), "addr err");
+        IGovernorToken(tokenMsg[token].governorToken).delegate(delegatee);
     }
 
     function setTokenParm(
@@ -207,13 +276,32 @@ contract Bonding is
         );
     }
 
+    function getGovernorParm() public view returns (uint256, uint48, uint32, uint256, uint256) {
+        return (
+            timelockDelay,
+            votingDelay,
+            votingPeriod,
+            proposalThreshold,
+            quorumNumeratorValue
+        );
+    }
+
+    function getGovernorMsg() public view returns (address, address, address, address) {
+        return (
+            governorTokenImpl,
+            governorImpl,
+            timelockControllerImpl,
+            defaultDelegatee
+        );
+    }
+
     function launch(
         string memory _name,
         string memory _ticker,
         string memory eid,
         string memory desc,
         string memory img,
-        string[4] memory urls,
+        string[5] memory urls,
         uint256 purchaseAmount
     ) public nonReentrant {
         require(
@@ -281,16 +369,18 @@ contract Bonding is
             telegram: urls[1],
             youtube: urls[2],
             website: urls[3],
+            keyHash:urls[4],
             trading: true,
             tradingOnUniswap: false
         });
         tokenInfo[address(token)] = tmpToken;
         tokenInfos.push(address(token));
         emit Launched(address(token), _pair);
-        if(bytes(urls[0]).length> 0)emit Twitter(address(token), urls[0]);
-        if(bytes(urls[1]).length > 0)emit Telegram(address(token), urls[1]);
-        if(bytes(urls[2]).length > 0)emit Youtube(address(token), urls[2]);
-        if(bytes(urls[3]).length > 0)emit Website(address(token), urls[3]);
+        if(bytes(urls[0]).length> 2)emit Twitter(address(token), urls[0]);
+        if(bytes(urls[1]).length > 2)emit Telegram(address(token), urls[1]);
+        if(bytes(urls[2]).length > 2)emit Youtube(address(token), urls[2]);
+        if(bytes(urls[3]).length > 2)emit Website(address(token), urls[3]);
+        if(bytes(urls[4]).length > 2)emit KeyHash(address(token), urls[4]);
 
         // Make initial purchase
         IERC20(assetToken).forceApprove(address(router), initialPurchase);
@@ -341,7 +431,6 @@ contract Bonding is
         router.graduate(tokenAddress);
         address lp = _addInitialLiquidity(token_, IERC20(assetToken));
         agentFactory.graduate(address(token_), lp);
-        emit Graduated(address(token_), lp);
     }
 
     function _addInitialLiquidity(IAgentToken token_, IERC20 _assetToken) internal returns(address){
@@ -372,11 +461,38 @@ contract Bonding is
             block.timestamp
         );
         token_.setTokenSta();
-        IStakeVault stakeVault = IStakeVault(Clones.clone(stakeVaultImpl));
-        tokenStake[address(token_)] = address(stakeVault);
-        IERC20(uniswapV2Pair_).approve(address(stakeVault), lpTokens);
-        stakeVault.initialize(uniswapV2Pair_, lpTokens);
+        _addGovernor(uniswapV2Pair_, lpTokens, token_, tokenInfo[address(token_)].data.name, tokenInfo[address(token_)].data.ticker);
         return uniswapV2Pair_;
     }
 
+    function _addGovernor(address uniswapV2Pair_, uint256 lpTokens, IAgentToken token_, string memory name, string memory ticker) internal{
+        tokenMsg[address(token_)].pair = uniswapV2Pair_;
+        IGovernorToken governorToken = IGovernorToken(Clones.clone(governorTokenImpl));
+        tokenMsg[address(token_)].governorToken = address(governorToken);
+        IERC20(uniswapV2Pair_).approve(address(governorToken), lpTokens);
+        governorToken.initialize(uniswapV2Pair_, string.concat("Staked ", name), string.concat("s", ticker), block.timestamp + 3650 days);
+        governorToken.stake(lpTokens, defaultDelegatee);
+
+        ITimelockController timelockController = ITimelockController(Clones.clone(timelockControllerImpl));
+        tokenMsg[address(token_)].timelock = address(timelockController);
+
+        IGovernor governor = IGovernor(Clones.clone(governorImpl));
+        tokenMsg[address(token_)].governor = address(governor);
+        governor.initialize(
+            address(governorToken),
+            address(timelockController),
+            string.concat(name, " DAO"),
+            votingDelay,
+            votingPeriod,
+            proposalThreshold,
+            quorumNumeratorValue
+        );
+
+        address[] memory proposers = new address[](1);
+        address[] memory executors = new address[](1);
+        proposers[0] = address(governor);
+        executors[0] = address(governor);
+        timelockController.initialize(timelockDelay, proposers, executors, address(0));
+        emit Graduated(address(token_), uniswapV2Pair_, address(governorToken), address(governor), address(timelockController));
+    }
 }
