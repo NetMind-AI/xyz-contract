@@ -101,8 +101,10 @@ async function exec() {
     await tx.wait(3);
     tx = await Bonding.addBlockedWord(["nmt", "netmind", "xyz"])
     await tx.wait(3);
-
-    console.log(await Bonding.getTokenParm())
+    let QueryData = await deploy('QueryData',0,'QueryData')
+    let QueryDataProxy = await deploy('QueryDataProxy',0,'QueryDataProxy', QueryData.target)
+    QueryData = await getContract(0,'QueryData', QueryDataProxy.target.toString())
+    QueryData.initialize(Bonding.target, process.env.PAIR)
 
 }
 

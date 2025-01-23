@@ -157,7 +157,6 @@ contract Bonding is
     }
 
     function addBlockedWord(string[] memory words) public onlyOwner {
-        delete blockedWords;
         for (uint256 i = 0; i < words.length; i++) {
             blockedWords.push(words[i]);
         }
