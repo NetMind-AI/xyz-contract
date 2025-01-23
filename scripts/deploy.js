@@ -99,10 +99,12 @@ async function exec() {
         process.env.QUORUM_NUMERATOR
     )
     await tx.wait(3);
+    tx = await Bonding.addBlockedWord(["nmt", "netmind", "xyz"])
+    await tx.wait(3);
+
     console.log(await Bonding.getTokenParm())
 
 }
-
 
 // We recommend this pattern to be able to use async/await everywhere
 // and properly handle errors.

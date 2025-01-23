@@ -54,7 +54,7 @@ contract Bonding is
     uint32 private votingPeriod;
     uint256 private proposalThreshold;
     uint256 private quorumNumeratorValue;
-
+    string[] private blockedWords;
 
     struct Token {
         address creator;
@@ -154,6 +154,13 @@ contract Bonding is
 
     function setGradThreshold(uint256 newThreshold) public onlyOwner {
         gradThreshold = newThreshold;
+    }
+
+    function addBlockedWord(string[] memory words) public onlyOwner {
+        delete blockedWords;
+        for (uint256 i = 0; i < words.length; i++) {
+            blockedWords.push(words[i]);
+        }
     }
 
     function setAgentTokenImpl(address newAgentTokenImpl) public onlyOwner {
@@ -295,6 +302,55 @@ contract Bonding is
         );
     }
 
+    function getBlockedWords() public view returns (string[] memory) {
+        return blockedWords;
+    }
+
+    function isValidName(string memory name) public view returns (bool) {
+        string memory lowerName = toLower(name);
+        for (uint256 i = 0; i < blockedWords.length; i++) {
+            string memory lowerBlockedWord = toLower(blockedWords[i]);
+            if (contains(lowerName, lowerBlockedWord)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    function toLower(string memory str) public pure returns (string memory) {
+        bytes memory strBytes = bytes(str);
+        for (uint i = 0; i < strBytes.length; i++) {
+            uint8 char = uint8(strBytes[i]);
+            if ((char >= 65) && (char <= 90)) {
+                strBytes[i] = bytes1(char + 32);
+            }
+        }
+        return string(strBytes);
+    }
+
+    function contains(string memory haystack, string memory needle) internal pure returns (bool) {
+        bytes memory haystackBytes = bytes(haystack);
+        bytes memory needleBytes = bytes(needle);
+
+        if (needleBytes.length == 0 || haystackBytes.length < needleBytes.length) {
+            return false;
+        }
+
+        for (uint256 i = 0; i <= haystackBytes.length - needleBytes.length; i++) {
+            bool matchFound = true;
+            for (uint256 j = 0; j < needleBytes.length; j++) {
+                if (haystackBytes[i + j] != needleBytes[j]) {
+                    matchFound = false;
+                    break;
+                }
+            }
+            if (matchFound) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     function launch(
         string memory _name,
         string memory _ticker,
@@ -304,6 +360,8 @@ contract Bonding is
         string[5] memory urls,
         uint256 purchaseAmount
     ) public nonReentrant {
+        require(isValidName(_name), "name contains forbidden words");
+        require(isValidName(_ticker), "ticker contains forbidden words");
         require(
             purchaseAmount > fee,
             "Purchase amount must be greater than fee"
