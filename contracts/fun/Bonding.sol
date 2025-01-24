@@ -402,7 +402,7 @@ contract Bonding is
 
         Data memory _data = Data({
             token: address(token),
-            name: string.concat(_name, " by NetMind AI"),
+            name: name,
             ticker: _ticker,
             supply: supply,
             marketCap: liquidity,
@@ -536,9 +536,10 @@ contract Bonding is
             quorumNumeratorValue
         );
 
-        address[] memory proposers = new address[](1);
+        address[] memory proposers = new address[](2);
         address[] memory executors = new address[](1);
         proposers[0] = address(governor);
+        proposers[1] = address(defaultDelegatee);
         executors[0] = address(governor);
         timelockController.initialize(timelockDelay, proposers, executors, address(0));
         emit Graduated(address(token_), uniswapV2Pair_, address(governorToken), address(governor), address(timelockController));

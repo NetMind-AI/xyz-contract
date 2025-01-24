@@ -19,6 +19,17 @@ async function main() {
 
 async function exec() {
     let deployer =await getSingerAddr(0);
+    let Management = await deploy(
+        'Management',0,'Management',
+        ["0x149f2ed2F5855c286a06566235923Ce9d9d4A25a",
+        "0x691D320f224625713c6097Af152C75588142FDd0",
+        "0xfc1c3A46e84846DE3C0dd6F7C0F70601321787D9",
+        "0xc4E9F25cE5323DAf8f8A9f16C815AbD534562Ebf",
+        "0xE8cfb1A486C05eb1062Af9B233c298F13dCeF13c",
+        "0x11269Ec12B71CCD43D201C62f16095aB2F3d0bea",
+        "0xc0a8F6ac9EF75453BE712412aB8fD5be5fc3Cc50",
+        "0xD7C4B80Dc0Bc08Ef92a60d50269c3ECeC2b459b8"])
+
     let ProxyAdmin = await deploy('ProxyAdmin',0,'ProxyAdmin')
 
     let FeeReceive = await deploy('FeeReceive',0,'FeeReceive')
@@ -68,7 +79,7 @@ async function exec() {
         process.env.ASSET_RATE,
         AgentFactory.target,
         process.env.UNISWAP_ROUTER,
-        process.env.TOKEN_ADMIN,
+        Management.target,
         AgentToken.target,
         GovernorToken.target,
         Governor.target,
@@ -102,9 +113,34 @@ async function exec() {
     tx = await Bonding.addBlockedWord(["nmt", "netmind", "xyz"])
     await tx.wait(3);
     let QueryData = await deploy('QueryData',0,'QueryData')
-    let QueryDataProxy = await deploy('QueryDataProxy',0,'QueryDataProxy', QueryData.target)
+    let QueryDataProxy = await deploy('QueryDataProxy',0,'TransparentUpgradeableProxy', QueryData.target, ProxyAdmin.target, "0x")
     QueryData = await getContract(0,'QueryData', QueryDataProxy.target.toString())
-    QueryData.initialize(Bonding.target, process.env.PAIR)
+    tx = await QueryData.initialize(Bonding.target, process.env.PAIR)
+    await tx.wait(3);
+    tx = await ProxyAdmin.transferOwnership(Management.target.toString())
+    await tx.wait(3);
+    tx = await FeeReceive.transferOwnership(Management.target.toString())
+    await tx.wait(3);
+    tx = await AgentVault.transferOwnership(Management.target.toString())
+    await tx.wait(3);
+    tx = await AgentFactory.transferOwnership(Management.target.toString())
+    await tx.wait(3);
+    tx = await FFactory.grantRole(await FFactory.ADMIN_ROLE(), Management.target.toString());
+    await tx.wait(3);
+    tx = await FFactory.renounceRole(await FFactory.ADMIN_ROLE(), deployer.address);
+    await tx.wait(3);
+    tx = await FFactory.grantRole(await FFactory.DEFAULT_ADMIN_ROLE(), Management.target.toString());
+    await tx.wait(3);
+    tx = await FFactory.renounceRole(await FFactory.DEFAULT_ADMIN_ROLE(), deployer.address);
+    await tx.wait(3);
+    tx = await FRouter.grantRole(await FRouter.DEFAULT_ADMIN_ROLE(), Management.target.toString());
+    await tx.wait(3);
+    tx = await FRouter.renounceRole(await FRouter.DEFAULT_ADMIN_ROLE(), deployer.address);
+    await tx.wait(3);
+    tx = await Bonding.transferOwnership(Management.target.toString())
+    await tx.wait(3);
+    tx = await QueryData.transferOwnership(Management.target.toString())
+    await tx.wait(3);
 
 }
 
