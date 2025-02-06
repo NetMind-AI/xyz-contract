@@ -10,6 +10,7 @@ interface IBonding {
     function router() external view returns (address);
     function uniswapRouter() external view returns (address);
     function gradThreshold() external view returns (uint256);
+    function tokenMsg(address token) external view returns (address, address, address, address);
 }
 
 interface IAgentToken {
@@ -56,6 +57,9 @@ contract QueryData is OwnableUpgradeable{
         uint256 sTokenBal;
         uint256 sNmtTokenBal;
         address pair;
+        address governorToken;
+        address governor;
+        address timelock;
     }
 
     constructor() {
@@ -82,8 +86,7 @@ contract QueryData is OwnableUpgradeable{
         uint256 nmtTokenBal;
         uint256 nmtTotal;
         bool status;
-        address pair;
-        (data.price, data.totalValue, tokenBal, nmtTokenBal, nmtTotal, status, pair) = getTokenData(threshold, token);
+        (data.price, data.totalValue, tokenBal, nmtTokenBal, nmtTotal, status, data.pair, data.governorToken, data.governor, data.timelock) = getTokenData(threshold, token);
         if(status){
             data.fTokenBal = tokenBal;
             data.fNmtTokenBal = nmtTokenBal;
@@ -97,7 +100,6 @@ contract QueryData is OwnableUpgradeable{
         }else{
             data.sTokenBal = tokenBal;
             data.sNmtTokenBal = nmtTokenBal;
-            data.pair = pair;
         }
         return data;
     }
@@ -114,7 +116,10 @@ contract QueryData is OwnableUpgradeable{
         uint256[] memory totalNmts,
         uint256[] memory sTokenBals,
         uint256[] memory sNmtTokenBals,
-        address[] memory pairs
+        address[] memory pairs,
+        address[] memory governorTokens,
+        address[] memory governors,
+        address[] memory timelocks
     ){
         uint256 len = tokens.length;
         uint256 threshold = bonding.gradThreshold();
@@ -131,9 +136,12 @@ contract QueryData is OwnableUpgradeable{
         sTokenBals = new uint256[](len);
         sNmtTokenBals = new uint256[](len);
         pairs = new address[](len);
+        governorTokens = new address[](len);
+        governors = new address[](len);
+        timelocks = new address[](len);
         bool status;
         for(uint i=0; i<len; i++){
-            (prices[i], totalValues[i], tokenBal, nmtTokenBal, nmtTotal, status, pairs[i]) = getTokenData(threshold, tokens[i]);
+            (prices[i], totalValues[i], tokenBal, nmtTokenBal, nmtTotal, status, pairs[i], governorTokens[i], governors[i], timelocks[i]) = getTokenData(threshold, tokens[i]);
             if(status){
                 fTokenBals[i] = tokenBal;
                 fNmtTokenBals[i] = nmtTokenBal;
@@ -161,7 +169,10 @@ contract QueryData is OwnableUpgradeable{
         uint256 nmtTokenBal,
         uint256 nmtTotal,
         bool status,
-        address pair
+        address pair,
+        address governorToken,
+        address governor,
+        address timelock
     ){
         uint256 totalSupply;
         IAgentToken agentToken = IAgentToken(token);
@@ -176,7 +187,7 @@ contract QueryData is OwnableUpgradeable{
             nmtTotal = getNmtTotal(threshold, token);
             status = true;
         }else{
-            pair = liquidityPools[0];
+            (governorToken, governor, timelock, pair)= bonding.tokenMsg(token);
             IUniswapV2Pair uniswapV2Pair = IUniswapV2Pair(liquidityPools[0]);
             address token0 = uniswapV2Pair.token0();
             (uint112 reserve0, uint112 reserve1,) = uniswapV2Pair.getReserves();
@@ -191,7 +202,7 @@ contract QueryData is OwnableUpgradeable{
             }
         }
         totalValue = totalSupply * price / 1e18;
-        return (price, totalValue, tokenBal, nmtTokenBal, nmtTotal, status, pair);
+        return (price, totalValue, tokenBal, nmtTokenBal, nmtTotal, status, pair, governorToken, governor, timelock);
     }
 
     function getTokenPrices(address[] memory tokens) public view returns(uint256[] memory, uint256[] memory){

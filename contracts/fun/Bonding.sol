@@ -67,6 +67,7 @@ contract Bonding is
         string telegram;
         string youtube;
         string website;
+        string keyHash;
         bool trading;
         bool tradingOnUniswap;
     }
@@ -93,6 +94,7 @@ contract Bonding is
     event Telegram(address indexed token, string telegram);
     event Youtube(address indexed token, string youtube);
     event Website(address indexed token, string website);
+    event KeyHash(address indexed token, string keyHash);
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -211,7 +213,8 @@ contract Bonding is
         string memory twitter,
         string memory telegram,
         string memory youtube,
-        string memory website
+        string memory website,
+        string memory keyHash
     ) public {
         address creator = tokenInfo[token].creator;
         if(bytes(twitter).length> 2 && auth(creator, token, bytes(tokenInfo[token].twitter).length)){
@@ -229,6 +232,10 @@ contract Bonding is
         if(bytes(website).length > 2 && auth(creator, token, bytes(tokenInfo[token].website).length)){
             tokenInfo[token].website = website;
             emit Website(token, website);
+        }
+        if(bytes(keyHash).length > 2 && auth(creator, token, bytes(tokenInfo[token].keyHash).length)){
+            tokenInfo[token].keyHash = keyHash;
+            emit KeyHash(token, keyHash);
         }
     }
 
@@ -349,7 +356,7 @@ contract Bonding is
         string memory eid,
         string memory desc,
         string memory img,
-        string[4] memory urls,
+        string[5] memory urls,
         uint256 purchaseAmount
     ) public nonReentrant {
         require(isValidName(_name), "name contains forbidden words");
@@ -419,6 +426,7 @@ contract Bonding is
             telegram: urls[1],
             youtube: urls[2],
             website: urls[3],
+            keyHash:urls[4],
             trading: true,
             tradingOnUniswap: false
         });
@@ -429,6 +437,7 @@ contract Bonding is
         if(bytes(urls[1]).length > 2)emit Telegram(address(token), urls[1]);
         if(bytes(urls[2]).length > 2)emit Youtube(address(token), urls[2]);
         if(bytes(urls[3]).length > 2)emit Website(address(token), urls[3]);
+        if(bytes(urls[4]).length > 2)emit KeyHash(address(token), urls[4]);
 
         // Make initial purchase
         IERC20(assetToken).forceApprove(address(router), initialPurchase);
