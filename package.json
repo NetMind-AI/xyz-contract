@@ -2,7 +2,7 @@
   "name": "hardhat-project",
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^3.0.0",
-    "@nomicfoundation/hardhat-verify": "^2.0.12",
+    "@nomicfoundation/hardhat-verify": "^1.0.0",
     "@openzeppelin/contracts": "5.0.0",
     "@openzeppelin/contracts-upgradeable": "5.0.0",
     "@openzeppelin/hardhat-upgrades": "^2.0.12",
