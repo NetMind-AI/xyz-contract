@@ -354,6 +354,7 @@ contract Bonding is
         string memory _name,
         string memory _ticker,
         string memory eid,
+        string memory model,
         string memory desc,
         string memory img,
         string[5] memory urls,
@@ -384,6 +385,7 @@ contract Bonding is
         agentFactory.newApplication(
             name,
             eid,
+            model,
             address(token),
             _pair
         );
