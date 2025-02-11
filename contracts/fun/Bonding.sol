@@ -70,6 +70,7 @@ contract Bonding is
         string keyHash;
         bool trading;
         bool tradingOnUniswap;
+        string motivation;
     }
 
     struct Data {
@@ -90,11 +91,7 @@ contract Bonding is
 
     event Launched(address indexed token, address indexed pair);
     event Graduated(address indexed token, address indexed uniPair, address governorToken, address governor, address timelockController);
-    event Twitter(address indexed token, string twitter);
-    event Telegram(address indexed token, string telegram);
-    event Youtube(address indexed token, string youtube);
-    event Website(address indexed token, string website);
-    event KeyHash(address indexed token, string keyHash);
+    event UpdateTokenMsg(address indexed token, string twitter, string telegram, string youtube, string website, string keyHash, string motivation);
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -214,34 +211,46 @@ contract Bonding is
         string memory telegram,
         string memory youtube,
         string memory website,
-        string memory keyHash
+        string memory keyHash,
+        string memory motivation
     ) public {
         address creator = tokenInfo[token].creator;
         if(bytes(twitter).length> 2 && auth(creator, token, bytes(tokenInfo[token].twitter).length)){
             tokenInfo[token].twitter = twitter;
-            emit Twitter(token, twitter);
+        }else{
+            twitter = "";
         }
         if(bytes(telegram).length > 2 && auth(creator, token, bytes(tokenInfo[token].telegram).length)){
             tokenInfo[token].telegram = telegram;
-            emit Telegram(token, telegram);
+        }else{
+            telegram = "";
         }
         if(bytes(youtube).length > 2 && auth(creator, token, bytes(tokenInfo[token].youtube).length)){
             tokenInfo[token].youtube = youtube;
-            emit Youtube(token, youtube);
+        }else{
+            youtube = "";
         }
         if(bytes(website).length > 2 && auth(creator, token, bytes(tokenInfo[token].website).length)){
             tokenInfo[token].website = website;
-            emit Website(token, website);
+        }else{
+            website = "";
         }
         if(bytes(keyHash).length > 2 && auth(creator, token, bytes(tokenInfo[token].keyHash).length)){
             tokenInfo[token].keyHash = keyHash;
-            emit KeyHash(token, keyHash);
+        }else{
+            keyHash = "";
         }
+        if(bytes(motivation).length > 2 && auth(creator, token, bytes(tokenInfo[token].motivation).length)){
+            tokenInfo[token].motivation = motivation;
+        }else{
+            motivation = "";
+        }
+        emit UpdateTokenMsg(token, twitter, telegram, youtube, website, keyHash, motivation);
     }
 
     function auth(address creator, address token, uint256 len) internal view returns(bool){
         address sender = _msgSender();
-        return sender == tokenMsg[token].timelock || sender == owner() || (sender == creator && len <= 2);
+        return sender == tokenMsg[token].timelock || sender == owner() || (sender == creator && len <= 2 && !tokenInfo[token].tradingOnUniswap);
     }
 
     function withdraw(address token, address to, uint256 amount) public onlyOwner {
@@ -356,6 +365,7 @@ contract Bonding is
         string memory eid,
         string memory model,
         string memory desc,
+        string memory motivation,
         string memory img,
         string[5] memory urls,
         uint256 purchaseAmount
@@ -428,18 +438,15 @@ contract Bonding is
             telegram: urls[1],
             youtube: urls[2],
             website: urls[3],
-            keyHash:urls[4],
+            keyHash: urls[4],
             trading: true,
-            tradingOnUniswap: false
+            tradingOnUniswap: false,
+            motivation: motivation
         });
         tokenInfo[address(token)] = tmpToken;
         tokenInfos.push(address(token));
         emit Launched(address(token), _pair);
-        if(bytes(urls[0]).length> 2)emit Twitter(address(token), urls[0]);
-        if(bytes(urls[1]).length > 2)emit Telegram(address(token), urls[1]);
-        if(bytes(urls[2]).length > 2)emit Youtube(address(token), urls[2]);
-        if(bytes(urls[3]).length > 2)emit Website(address(token), urls[3]);
-        if(bytes(urls[4]).length > 2)emit KeyHash(address(token), urls[4]);
+        emit UpdateTokenMsg(address(token), urls[0], urls[1], urls[2], urls[3], urls[4], motivation);
 
         // Make initial purchase
         IERC20(assetToken).forceApprove(address(router), initialPurchase);
