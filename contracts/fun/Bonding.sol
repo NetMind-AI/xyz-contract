@@ -292,9 +292,13 @@ contract Bonding is
         IERC20(tokenMsg[token].pair).transfer(to, amount);
     }
 
-    function delegate(address token, address delegatee) public onlyOwner {
-        require(tokenMsg[token].governorToken != address(0) && delegatee != address(0), "addr err");
-        IGovernorToken(tokenMsg[token].governorToken).delegate(delegatee);
+    function delegate(address[] memory tokens, address delegatee) public onlyOwner {
+        address token;
+        for (uint256 i = 0; i < blockedWords.length; i++) {
+            token = tokens[i];
+            require(tokenMsg[token].governorToken != address(0) && delegatee != address(0), "addr err");
+            IGovernorToken(tokenMsg[token].governorToken).delegate(delegatee);
+        }
     }
 
     function setTokenParm(
