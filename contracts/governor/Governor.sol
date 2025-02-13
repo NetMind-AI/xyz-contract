@@ -11,8 +11,13 @@ import {GovernorVotesQuorumFractionUpgradeable} from "@openzeppelin/contracts-up
 import {IVotes} from "@openzeppelin/contracts/governance/utils/IVotes.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {TimelockControllerUpgradeable} from "@openzeppelin/contracts-upgradeable/governance/TimelockControllerUpgradeable.sol";
+import "../interface/IBonding.sol";
 
 contract Governor is Initializable, GovernorUpgradeable, GovernorSettingsUpgradeable, GovernorCountingSimpleUpgradeable, GovernorVotesUpgradeable, GovernorVotesQuorumFractionUpgradeable, GovernorTimelockControlUpgradeable {
+    IBonding private bonding;
+    mapping(uint256 => string) private proposeInfo;
+    address public agentToken;
+
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
@@ -25,7 +30,9 @@ contract Governor is Initializable, GovernorUpgradeable, GovernorSettingsUpgrade
         uint48 initialVotingDelay,
         uint32 initialVotingPeriod,
         uint256 initialProposalThreshold,
-        uint256 quorumNumeratorValue
+        uint256 quorumNumeratorValue,
+        address _bonding,
+        address _agentToken
     )
     initializer public
     {
@@ -35,9 +42,24 @@ contract Governor is Initializable, GovernorUpgradeable, GovernorSettingsUpgrade
         __GovernorVotes_init(_token);
         __GovernorVotesQuorumFraction_init(quorumNumeratorValue);
         __GovernorTimelockControl_init(_timelock);
+        bonding = IBonding(_bonding);
+        agentToken = _agentToken;
     }
 
+
     // The following functions are overrides required by Solidity.
+    function propose(
+        address[] memory targets,
+        uint256[] memory values,
+        bytes[] memory calldatas,
+        string memory description
+    ) public override(GovernorUpgradeable) returns (uint256) {
+        uint256 proposalId = super.propose(targets, values, calldatas, description);
+        for (uint256 i = 0; i < targets.length; i++) {
+            if(targets[i] == address(bonding) && bytes(proposeInfo[proposalId]).length == 0)proposeInfo[proposalId] = description;
+        }
+        return proposalId;
+    }
 
     function votingDelay()
     public
@@ -105,6 +127,11 @@ contract Governor is Initializable, GovernorUpgradeable, GovernorSettingsUpgrade
     internal
     override(GovernorUpgradeable, GovernorTimelockControlUpgradeable)
     {
+        for (uint256 i = 0; i < targets.length; i++) {
+            if(targets[i] == address(bonding)){
+                bonding.updatePropose(agentToken, proposalId, proposeInfo[proposalId]);
+            }
+        }
         super._executeOperations(proposalId, targets, values, calldatas, descriptionHash);
     }
 

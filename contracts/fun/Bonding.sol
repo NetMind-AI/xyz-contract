@@ -55,6 +55,12 @@ contract Bonding is
     uint256 private proposalThreshold;
     uint256 private quorumNumeratorValue;
     string[] private blockedWords;
+    mapping(address => ProposeMsg) private proposeMsg;
+
+    struct ProposeMsg {
+        uint256 proposeId;
+        string proposeDesc;
+    }
 
     struct Token {
         address creator;
@@ -92,7 +98,7 @@ contract Bonding is
 
     event Launched(address indexed token, address indexed pair);
     event Graduated(address indexed token, address indexed uniPair, address governorToken, address governor, address timelockController);
-    event UpdateTokenMsg(address indexed token, string description, string model, string twitter, string telegram, string youtube, string website, string keyHash, string motivation);
+    event UpdateTokenMsg(address indexed token, string description, string model, string twitter, string telegram, string youtube, string website, string keyHash, string motivation, uint256 proposeId, string proposeDesc);
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -206,6 +212,12 @@ contract Bonding is
         tokenAdmin = newTokenAdmin;
     }
 
+    function updatePropose(address token, uint256 proposeId, string memory proposeDesc) public {
+        require(tokenMsg[token].governor == _msgSender(), "updatePropose err");
+        proposeMsg[token].proposeId = proposeId;
+        proposeMsg[token].proposeDesc = proposeDesc;
+    }
+
     function setTokenMsg(
         address token,
         string memory twitter,
@@ -218,6 +230,10 @@ contract Bonding is
         string memory model
     ) public {
         address creator = tokenInfo[token].creator;
+        ProposeMsg memory proposeMsg_;
+        if(tokenMsg[token].timelock == _msgSender()){
+            proposeMsg_ = proposeMsg[token];
+        }
         if(bytes(twitter).length> 2 && auth(creator, token, bytes(tokenInfo[token].twitter).length)){
             tokenInfo[token].twitter = twitter;
         }else{
@@ -258,7 +274,7 @@ contract Bonding is
         }else{
             model = "";
         }
-        emit UpdateTokenMsg(token, description, model, twitter, telegram, youtube, website, keyHash, motivation);
+        emit UpdateTokenMsg(token, description, model, twitter, telegram, youtube, website, keyHash, motivation, proposeMsg_.proposeId, proposeMsg_.proposeDesc);
     }
 
     function auth(address creator, address token, uint256 len) internal view returns(bool){
@@ -460,7 +476,7 @@ contract Bonding is
         tokenInfo[address(token)] = tmpToken;
         tokenInfos.push(address(token));
         emit Launched(address(token), _pair);
-        emit UpdateTokenMsg(address(token), desc, model, urls[0], urls[1], urls[2], urls[3], urls[4], motivation);
+        emit UpdateTokenMsg(address(token), desc, model, urls[0], urls[1], urls[2], urls[3], urls[4], motivation, 0, '');
 
         // Make initial purchase
         IERC20(assetToken).forceApprove(address(router), initialPurchase);
@@ -565,7 +581,9 @@ contract Bonding is
             votingDelay,
             votingPeriod,
             proposalThreshold,
-            quorumNumeratorValue
+            quorumNumeratorValue,
+            address(this),
+            address(token_)
         );
 
         address[] memory proposers = new address[](2);
