@@ -529,7 +529,7 @@ contract Bonding is
         }
     }
 
-    function getTradeSta() private returns(bool){
+    function getTradeSta() private view returns(bool){
         if(msg.sender != tx.origin && !buySta){
             return false;
         }else{
