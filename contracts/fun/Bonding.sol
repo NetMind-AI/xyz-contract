@@ -57,6 +57,7 @@ contract Bonding is
     string[] private blockedWords;
     mapping(address => ProposeMsg) private proposeMsg;
     uint256 public purchaseLimit;
+    bool public buySta;
 
     struct ProposeMsg {
         uint256 proposeId;
@@ -210,6 +211,10 @@ contract Bonding is
 
     function setPurchaseLimit(uint256 newPurchaseLimit) public onlyOwner {
         purchaseLimit = newPurchaseLimit;
+    }
+
+    function setBuySta(bool buySta_) public onlyOwner {
+        buySta = buySta_;
     }
 
     function setTokenAdmin(address newTokenAdmin) public onlyOwner {
@@ -498,6 +503,7 @@ contract Bonding is
         uint256 amountOutMin,
         address tokenAddress
     ) public{
+        require(getTradeSta(), "sender error");
         require(tokenInfo[tokenAddress].trading, "Token not trading");
         (, uint256 amountOut) = router.sell(amountIn, tokenAddress, msg.sender );
         require(amountOut >= amountOutMin, "amountOutMin error");
@@ -510,6 +516,7 @@ contract Bonding is
         uint256 amountOutMin,
         address tokenAddress
     ) public{
+        require(getTradeSta(), "sender error");
         require(amountIn <= purchaseLimit, "purchaseLimit error");
         require(tokenInfo[tokenAddress].trading, "Token not trading");
         (, uint256 amountOut) = router.buy(amountIn, tokenAddress, msg.sender );
@@ -519,6 +526,14 @@ contract Bonding is
         tokenInfo[tokenAddress].data.price = IFPair(pairAddress).priceBLast();
         if (reserveA <= gradThreshold && tokenInfo[tokenAddress].trading) {
             _openTradingOnUniswap(tokenAddress);
+        }
+    }
+
+    function getTradeSta() private returns(bool){
+        if(msg.sender != tx.origin && !buySta){
+            return false;
+        }else{
+            return true;
         }
     }
 
