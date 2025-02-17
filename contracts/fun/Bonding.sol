@@ -56,6 +56,7 @@ contract Bonding is
     uint256 private quorumNumeratorValue;
     string[] private blockedWords;
     mapping(address => ProposeMsg) private proposeMsg;
+    uint256 public purchaseLimit;
 
     struct ProposeMsg {
         uint256 proposeId;
@@ -205,6 +206,10 @@ contract Bonding is
     function setAssetRate(uint256 newRate) public onlyOwner {
         require(newRate > 0, "Rate err");
         assetRate = newRate;
+    }
+
+    function setPurchaseLimit(uint256 newPurchaseLimit) public onlyOwner {
+        purchaseLimit = newPurchaseLimit;
     }
 
     function setTokenAdmin(address newTokenAdmin) public onlyOwner {
@@ -505,6 +510,7 @@ contract Bonding is
         uint256 amountOutMin,
         address tokenAddress
     ) public{
+        require(amountIn <= purchaseLimit, "purchaseLimit error");
         require(tokenInfo[tokenAddress].trading, "Token not trading");
         (, uint256 amountOut) = router.buy(amountIn, tokenAddress, msg.sender );
         require(amountOut >= amountOutMin, "amountOutMin error");

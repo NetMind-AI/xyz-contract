@@ -95,6 +95,8 @@ async function exec() {
       FeeReceive.target,
     );
     await tx.wait(3);
+    tx = await Bonding.setPurchaseLimit(ethers.parseEther("600"));
+    await tx.wait(3);
     tx = await FFactory.grantRole(await FFactory.CREATOR_ROLE(), Bonding.target);
     await tx.wait(3);
     tx = await FRouter.grantRole(await FRouter.EXECUTOR_ROLE(), Bonding.target);
