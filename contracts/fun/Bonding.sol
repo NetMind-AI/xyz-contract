@@ -218,7 +218,6 @@ contract Bonding is
     }
 
     function setTokenAdmin(address newTokenAdmin) public onlyOwner {
-        require(newTokenAdmin != address(0), "address err");
         tokenAdmin = newTokenAdmin;
     }
 
