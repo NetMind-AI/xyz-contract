@@ -217,10 +217,6 @@ contract Bonding is
         buySta = buySta_;
     }
 
-    function setTokenAdmin(address newTokenAdmin) public onlyOwner {
-        tokenAdmin = newTokenAdmin;
-    }
-
     function updatePropose(address token, uint256 proposeId, string memory proposeDesc) public {
         require(tokenMsg[token].governor == _msgSender(), "updatePropose err");
         proposeMsg[token].proposeId = proposeId;
@@ -458,10 +454,11 @@ contract Bonding is
             _pair,
             address(this),
             projectTaxRecipient,
-            tokenAdmin,
+            address(this),
             address(uniswapRouter)
         );
         token.initialize(name, _ticker, tokenParams);
+        token.renounceOwnership();
         uint256 supply = token.totalSupply();
         token.approve(address(router), supply);
         uint256 k = ((K * 10000) / assetRate);

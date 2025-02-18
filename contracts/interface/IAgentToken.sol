@@ -55,7 +55,7 @@ IErrors
     event ValidCallerAdded(bytes32 addedValidCaller);
 
     event ValidCallerRemoved(bytes32 removedValidCaller);
-
+    function renounceOwnership() external;
     /**
      * @dev function {isLiquidityPool}
      *
