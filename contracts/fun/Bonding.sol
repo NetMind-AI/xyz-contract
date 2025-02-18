@@ -18,6 +18,7 @@ import "../interface/IAgentFactory.sol";
 import "../interface/IUniswapV2Router.sol";
 import "../interface/IUniswapV2Factory.sol";
 import "../interface/IGovernor.sol";
+import "../interface/IOwnable.sol";
 
 contract Bonding is
     Initializable,
@@ -458,7 +459,7 @@ contract Bonding is
             address(uniswapRouter)
         );
         token.initialize(name, _ticker, tokenParams);
-        token.renounceOwnership();
+        IOwnable(address(token)).renounceOwnership();
         uint256 supply = token.totalSupply();
         token.approve(address(router), supply);
         uint256 k = ((K * 10000) / assetRate);
