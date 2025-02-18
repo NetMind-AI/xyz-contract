@@ -244,42 +244,42 @@ contract Bonding is
         if(tokenMsg[token].timelock == _msgSender()){
             proposeMsg_ = proposeMsg[token];
         }
-        if(bytes(twitter).length> 2 && auth(creator, token, bytes(tokenInfo[token].twitter).length)){
+        if(bytes(twitter).length> 2 && auth(creator, token, bytes(tokenInfo[token].twitter).length, true, true)){
             tokenInfo[token].twitter = twitter;
         }else{
             twitter = "";
         }
-        if(bytes(telegram).length > 2 && auth(creator, token, bytes(tokenInfo[token].telegram).length)){
+        if(bytes(telegram).length > 2 && auth(creator, token, bytes(tokenInfo[token].telegram).length, false, true)){
             tokenInfo[token].telegram = telegram;
         }else{
             telegram = "";
         }
-        if(bytes(youtube).length > 2 && auth(creator, token, bytes(tokenInfo[token].youtube).length)){
+        if(bytes(youtube).length > 2 && auth(creator, token, bytes(tokenInfo[token].youtube).length, false, true)){
             tokenInfo[token].youtube = youtube;
         }else{
             youtube = "";
         }
-        if(bytes(website).length > 2 && auth(creator, token, bytes(tokenInfo[token].website).length)){
+        if(bytes(website).length > 2 && auth(creator, token, bytes(tokenInfo[token].website).length, false, true)){
             tokenInfo[token].website = website;
         }else{
             website = "";
         }
-        if(bytes(keyHash).length > 2 && auth(creator, token, bytes(tokenInfo[token].keyHash).length)){
+        if(bytes(keyHash).length > 2 && auth(creator, token, bytes(tokenInfo[token].keyHash).length, false, false)){
             tokenInfo[token].keyHash = keyHash;
         }else{
             keyHash = "";
         }
-        if(bytes(motivation).length > 2 && auth(creator, token, bytes(tokenInfo[token].motivation).length)){
+        if(bytes(motivation).length > 2 && auth(creator, token, bytes(tokenInfo[token].motivation).length, false, false)){
             tokenInfo[token].motivation = motivation;
         }else{
             motivation = "";
         }
-        if(bytes(description).length > 2 && auth(creator, token, bytes(tokenInfo[token].motivation).length)){
+        if(bytes(description).length > 2 && auth(creator, token, bytes(tokenInfo[token].motivation).length, false, false)){
             tokenInfo[token].motivation = description;
         }else{
             description = "";
         }
-        if(bytes(model).length > 2 && auth(creator, token, bytes(tokenInfo[token].motivation).length)){
+        if(bytes(model).length > 2 && auth(creator, token, bytes(tokenInfo[token].motivation).length, false, false)){
             tokenInfo[token].motivation = model;
         }else{
             model = "";
@@ -287,9 +287,17 @@ contract Bonding is
         emit UpdateTokenMsg(token, description, model, twitter, telegram, youtube, website, keyHash, motivation, proposeMsg_.proposeId, proposeMsg_.proposeDesc);
     }
 
-    function auth(address creator, address token, uint256 len) internal view returns(bool){
+    function auth(address creator, address token, uint256 len, bool kind, bool status) internal view returns(bool){
         address sender = _msgSender();
-        return sender == tokenMsg[token].timelock || sender == owner() || (sender == creator && len <= 2 && !tokenInfo[token].tradingOnUniswap);
+        if(sender == creator && len <= 2){
+            if(kind){
+                return status;
+            }else{
+                return !tokenInfo[token].tradingOnUniswap && status;
+            }
+        }else{
+            return sender == tokenMsg[token].timelock || sender == owner();
+        }
     }
 
     function withdraw(address token, address to, uint256 amount) public onlyOwner {
