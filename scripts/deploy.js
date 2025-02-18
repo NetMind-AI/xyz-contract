@@ -79,7 +79,7 @@ async function exec() {
         process.env.ASSET_RATE,
         AgentFactory.target,
         process.env.UNISWAP_ROUTER,
-        Management.target,
+        "0x0000000000000000000000000000000000000000",
         AgentToken.target,
         GovernorToken.target,
         Governor.target,
