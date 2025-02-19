@@ -21,7 +21,6 @@ contract FRouter is
     bytes32 public constant EXECUTOR_ROLE = keccak256("EXECUTOR_ROLE");
 
     FFactory public factory;
-    address public assetToken;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -29,38 +28,40 @@ contract FRouter is
     }
 
     function initialize(
-        address factory_,
-        address assetToken_
+        address factory_
     ) external initializer {
         __ReentrancyGuard_init();
         __AccessControl_init();
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
 
         require(factory_ != address(0), "Zero addresses are not allowed.");
-        require(assetToken_ != address(0), "Zero addresses are not allowed.");
-
+    
         factory = FFactory(factory_);
-        assetToken = assetToken_;
     }
 
     function getAmountsOut(
-        address token,
-        address assetToken_,
+        address tokenIn,
+        address tokenOut,
         uint256 amountIn
     ) public view returns (uint256 _amountOut) {
-        require(token != address(0), "Zero addresses are not allowed.");
+        require(tokenIn != address(0) && tokenOut != address(0), "Zero addresses are not allowed.");
 
-        address pairAddress = factory.getPair(token, assetToken);
-
+        address pairAddress = factory.getPair(tokenIn, tokenOut);
+        if (pairAddress == address(0)){
+            pairAddress = factory.getPair(tokenOut, tokenIn);
+        }
+         
         IFPair pair = IFPair(pairAddress);
 
         (uint256 reserveA, uint256 reserveB) = pair.getReserves();
+
+        address assetToken = pair.tokenB();
 
         uint256 k = pair.kLast();
 
         uint256 amountOut;
 
-        if (assetToken_ == assetToken) {
+        if (tokenOut == assetToken) {
             uint256 newReserveB = reserveB + amountIn;
 
             uint256 newReserveA = k / newReserveB;
@@ -78,42 +79,37 @@ contract FRouter is
     }
 
     function addInitialLiquidity(
-        address token_,
-        uint256 amountToken_,
-        uint256 amountAsset_
+        address tokenA,
+        address tokenB,
+        uint256 amountA,
+        uint256 amountB
     ) public onlyRole(EXECUTOR_ROLE) returns (uint256, uint256) {
-        require(token_ != address(0), "Zero addresses are not allowed.");
+        require(tokenA != address(0) && tokenB != address(0), "Zero addresses are not allowed.");
 
-        address pairAddress = factory.getPair(token_, assetToken);
+        address pairAddress = factory.getPair(tokenA, tokenB);
 
-        IFPair pair = IFPair(pairAddress);
+        IERC20(tokenA).safeTransferFrom(msg.sender, pairAddress, amountA);
 
-        IERC20 token = IERC20(token_);
+        IFPair(pairAddress).mint(amountA, amountB);
 
-        token.safeTransferFrom(msg.sender, pairAddress, amountToken_);
-
-        pair.mint(amountToken_, amountAsset_);
-
-        return (amountToken_, amountAsset_);
+        return (amountA, amountB);
     }
 
     function sell(
         uint256 amountIn,
-        address tokenAddress,
+        address pairAddress,
         address to
     ) public nonReentrant onlyRole(EXECUTOR_ROLE) returns (uint256, uint256) {
-        require(tokenAddress != address(0), "Zero addresses are not allowed.");
+        require(pairAddress != address(0), "Zero addresses are not allowed.");
         require(to != address(0), "Zero addresses are not allowed.");
-
-        address pairAddress = factory.getPair(tokenAddress, assetToken);
 
         IFPair pair = IFPair(pairAddress);
 
-        IERC20 token = IERC20(tokenAddress);
+        address tokenAddress = pair.tokenA();
 
         uint256 amountOut = getAmountsOut(tokenAddress, address(0), amountIn);
 
-        token.safeTransferFrom(to, pairAddress, amountIn);
+        IERC20(tokenAddress).safeTransferFrom(to, pairAddress, amountIn);
 
         uint fee = factory.sellTax();
         uint256 txFee = (fee * amountOut) / 100;
@@ -131,43 +127,47 @@ contract FRouter is
 
     function buy(
         uint256 amountIn,
-        address tokenAddress,
+        address pairAddress,
         address to
     ) public onlyRole(EXECUTOR_ROLE) nonReentrant returns (uint256, uint256) {
-        require(tokenAddress != address(0), "Zero addresses are not allowed.");
+        require(pairAddress != address(0), "Zero addresses are not allowed.");
         require(to != address(0), "Zero addresses are not allowed.");
         require(amountIn > 0, "amountIn must be greater than 0");
 
-        address pair = factory.getPair(tokenAddress, assetToken);
+        IFPair pair = IFPair(pairAddress);
 
         uint fee = factory.buyTax();
         uint256 txFee = (fee * amountIn) / 100;
         address feeTo = factory.taxVault();
 
         uint256 amount = amountIn - txFee;
+        address tokenAddress = pair.tokenA();
+        address assetToken = pair.tokenB();
 
-        IERC20(assetToken).safeTransferFrom(to, pair, amount);
+        IERC20(assetToken).safeTransferFrom(to, pairAddress, amount);
 
         IERC20(assetToken).safeTransferFrom(to, feeTo, txFee);
 
         uint256 amountOut = getAmountsOut(tokenAddress, assetToken, amount);
 
-        IFPair(pair).transferTo(to, amountOut);
+        pair.transferTo(to, amountOut);
 
-        IFPair(pair).swap(0, amountOut, amount, 0);
+        pair.swap(0, amountOut, amount, 0);
 
         return (amount, amountOut);
     }
 
     function graduate(
-        address tokenAddress
+        address pairAddress
     ) public onlyRole(EXECUTOR_ROLE) nonReentrant {
-        require(tokenAddress != address(0), "Zero addresses are not allowed.");
-        address pair = factory.getPair(tokenAddress, assetToken);
-        uint256 assetBalance = IFPair(pair).assetBalance();
-        FPair(pair).transferAsset(msg.sender, assetBalance);
-        uint256 balance = IFPair(pair).balance();
-        FPair(pair).transferTo(msg.sender, balance);
+        require(pairAddress != address(0), "Zero addresses are not allowed.");
+
+        IFPair pair = IFPair(pairAddress);
+       
+        uint256 assetBalance = pair.assetBalance();
+        pair.transferAsset(msg.sender, assetBalance);
+        uint256 balance = pair.balance();
+        pair.transferTo(msg.sender, balance);
     }
 
     function approval(
