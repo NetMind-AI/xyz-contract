@@ -31,10 +31,10 @@ contract Bonding is
     address public feeTo;
     FFactory public factory;
     FRouter public router;
-    uint256 private initialSupply;
+    uint256 public initialSupply;
     uint256 private fee;
     uint256 private assetRate;
-    uint256 private gradThreshold;
+    uint256 public gradThreshold;
     IAgentFactory public agentFactory;
     IUniswapV2Router public uniswapRouter;
     address public agentTokenImpl;

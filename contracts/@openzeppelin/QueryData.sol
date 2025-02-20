@@ -131,7 +131,7 @@ contract QueryData is OwnableUpgradeable{
         uint256 assetTokenBal;
         uint256 assetTokenTotal;
         bool status;
-        (data.price, data.totalValue, tokenBal, assetTokenBal, assetTokenTotal, status, data.pair, data.governorToken, data.governor, data.timelock) = getTokenData(token);
+        (data.price, data.totalValue, tokenBal, assetTokenBal, assetTokenTotal, status, data.pair, data.governorToken, data.governor, data.timelock) = getTokenData(threshold, token);
         if(status){
             data.fTokenBal = tokenBal;
             data.fNmtTokenBal = assetTokenBal;
@@ -188,7 +188,7 @@ contract QueryData is OwnableUpgradeable{
         timelocks = new address[](len);
         bool status;
         for(uint i=0; i<len; i++){
-            (prices[i], totalValues[i], tokenBal, assetTokenBal, assetTokenTotal, status, pairs[i], governorTokens[i], governors[i], timelocks[i]) = getTokenData(tokens[i]);
+            (prices[i], totalValues[i], tokenBal, assetTokenBal, assetTokenTotal, status, pairs[i], governorTokens[i], governors[i], timelocks[i]) = getTokenData(threshold, tokens[i]);
             if(status){
                 fTokenBals[i] = tokenBal;
                 fNmtTokenBals[i] = assetTokenBal;
@@ -208,7 +208,10 @@ contract QueryData is OwnableUpgradeable{
         }
     }
 
-    function getTokenData(address token) public view returns(
+    function getTokenData(
+        uint256 threshold,
+        address token
+    ) public view returns(
         uint256 price,
         uint256 totalValue,
         uint256 tokenBal,
@@ -231,7 +234,7 @@ contract QueryData is OwnableUpgradeable{
             (uint256 tokenBal_, uint256 assetBal) = fpair.getReserves();
             tokenBal = tokenBal_;
             assetTokenBal = IERC20(fpair.tokenB()).balanceOf(address(fpair));
-            (, , , , assetTokenTotal)= bonding.tokenMsg(token);
+            (, , , , assetTokenTotal)= getNmtTotal(threshold, token);
             status = true;
         }else{
             (governorToken, governor, timelock, pair,)= bonding.tokenMsg(token);
@@ -295,9 +298,30 @@ contract QueryData is OwnableUpgradeable{
         }
     }
 
-    function getNmtTotal(address token) public view returns(uint256){
+    function getNmtTotal(uint256 threshold, address token) public view returns(uint256){
         (, , , , uint256 assetTokenTotal)= bonding.tokenMsg(token);
-        return assetTokenTotal;
+        if(assetTokenTotal == 0){
+            IFPair fpair = IFPair(bonding.tokenInfo(token).pair);
+            uint256 reserveA = IERC20(token).totalSupply();
+            uint256 reserveB = fpair.kLast() / reserveA;
+            return calculateAmountIn(uint128(reserveA), uint128(reserveB), uint128(reserveA) - uint128(threshold), fpair.kLast());
+        }else{
+            return assetTokenTotal;
+        }
+    }
+
+    function calculateAmountIn(
+        uint128 reserveA,
+        uint128 reserveB,
+        uint128 amountOut,
+        uint256 k
+    ) public pure returns (uint128 amountIn) {
+        require(amountOut < reserveA, "Invalid amountOut");
+        uint256 newReserveA = uint256(reserveA) - uint256(amountOut);
+        uint256 newReserveB = k / newReserveA;
+        require(newReserveB > reserveB, "Invalid reserves");
+        amountIn = uint128(newReserveB - uint256(reserveB));
+        return amountIn;
     }
 
 }
