@@ -19,6 +19,7 @@ import "../interface/IUniswapV2Router.sol";
 import "../interface/IUniswapV2Factory.sol";
 import "../interface/IGovernor.sol";
 import "../interface/IOwnable.sol";
+import {IWrapToken, IUniswapV2Pair} from "../interface/IInterface.sol";
 
 contract Bonding is
     Initializable,
@@ -30,17 +31,17 @@ contract Bonding is
     address public feeTo;
     FFactory public factory;
     FRouter public router;
-    uint256 public initialSupply;
-    uint256 public fee;
-    uint256 public assetRate;
-    uint256 public gradThreshold;
+    uint256 private initialSupply;
+    uint256 private fee;
+    uint256 private assetRate;
+    uint256 private gradThreshold;
     IAgentFactory public agentFactory;
     IUniswapV2Router public uniswapRouter;
     address public agentTokenImpl;
     mapping(address => Token) public tokenInfo;
     address[] public tokenInfos;
 
-    address public tokenAdmin;
+    address private tokenAdmin;
     uint256 private taxSwapThresholdBasisPoints;
     uint256 private projectBuyTaxBasisPoints;
     uint256 private projectSellTaxBasisPoints;
@@ -59,6 +60,15 @@ contract Bonding is
     mapping(address => ProposeMsg) private proposeMsg;
     uint256 public purchaseLimit;
     bool public buySta;
+    IWrapToken public wrapToken;
+    mapping(address => LunachMsg) private lunachMsg;
+
+    struct LunachMsg{
+        uint256 initSupply;
+        uint256 fee;
+        uint256 upperLimit;
+        uint256 lowerLimit;
+    }
 
     struct ProposeMsg {
         uint256 proposeId;
@@ -97,6 +107,7 @@ contract Bonding is
         address governor;
         address timelock;
         address pair;
+        uint256 gradThreshold;
     }
 
     event Launched(address indexed token, address indexed pair);
@@ -159,8 +170,9 @@ contract Bonding is
         defaultDelegatee = newDelegatee;
     }
 
-    function setGradThreshold(uint256 newThreshold) public onlyOwner {
-        gradThreshold = newThreshold;
+    function setWrapToken(address wrapToken_) public onlyOwner {
+        require(wrapToken_ != address(0), "wrapToken err");
+        wrapToken = IWrapToken(wrapToken_);
     }
 
     function addBlockedWord(string[] memory words) public onlyOwner {
@@ -199,15 +211,23 @@ contract Bonding is
         quorumNumeratorValue = newQuorumNumerator;
     }
 
-    function setFee(uint256 newFee, address newFeeTo) public onlyOwner {
-        fee = (newFee * 1 ether) / 1000;
-        require(fee <= 1e22, "fee err");
-        if(newFeeTo != address(0))feeTo = newFeeTo;
+    function setLunachMsg(
+        address token,
+        uint256 initSupply,
+        uint256 fee,
+        uint256 upperLimit,
+        uint256 lowerLimit
+    ) public onlyOwner {
+        require(lowerLimit <= upperLimit, "upperLimit err");
+        if(token == address(0)){
+            require(address(wrapToken) != address(0), "wrapToken err");
+            token = address(wrapToken);
+        }
+        lunachMsg[token] = LunachMsg(initSupply, fee, upperLimit, lowerLimit);
     }
 
-    function setAssetRate(uint256 newRate) public onlyOwner {
-        require(newRate > 0, "Rate err");
-        assetRate = newRate;
+    function setFeeTo(address newFeeTo) public onlyOwner {
+        feeTo = newFeeTo;
     }
 
     function setPurchaseLimit(uint256 newPurchaseLimit) public onlyOwner {
@@ -348,6 +368,11 @@ contract Bonding is
         );
     }
 
+    function getLunachMsg(address token) public view returns (LunachMsg memory) {
+        if(token == address(0))token = address(wrapToken);
+        return lunachMsg[token];
+    }
+
     function getGovernorMsg() public view returns (address, address, address, address) {
         return (
             governorTokenImpl,
@@ -372,7 +397,7 @@ contract Bonding is
         return true;
     }
 
-    function toLower(string memory str) public pure returns (string memory) {
+    function toLower(string memory str) internal pure returns (string memory) {
         bytes memory strBytes = bytes(str);
         for (uint i = 0; i < strBytes.length; i++) {
             uint8 char = uint8(strBytes[i]);
@@ -415,28 +440,42 @@ contract Bonding is
         string memory motivation,
         string memory img,
         string[5] memory urls,
-        uint256 purchaseAmount
-    ) public nonReentrant {
+        address purchaseToken,
+        uint256 purchaseAmount,
+        uint256 gradThreshold
+    ) public payable nonReentrant {
         require(isValidName(_name), "name contains forbidden words");
         require(isValidName(_ticker), "ticker contains forbidden words");
-        require(
-            purchaseAmount > fee,
-            "Purchase amount must be greater than fee"
-        );
-        address assetToken = router.assetToken();
-        require(
-            IERC20(assetToken).balanceOf(msg.sender) >= purchaseAmount,
-            "Insufficient amount"
-        );
-        uint256 initialPurchase = (purchaseAmount - fee);
-        IERC20(assetToken).safeTransferFrom(msg.sender, feeTo, fee);
-        IERC20(assetToken).safeTransferFrom(
-            msg.sender,
-            address(this),
-            initialPurchase
-        );
-        IAgentToken token = IAgentToken(Clones.clone(agentTokenImpl));
+        LunachMsg memory _lunachMsg = lunachMsg[purchaseToken];
+        require(_lunachMsg.initSupply > 0,"PurchaseToken error");
+        require(_lunachMsg.upperLimit >= gradThreshold && _lunachMsg.lowerLimit <= gradThreshold,"Limit error");
+        address assetToken = purchaseToken;
+        if(purchaseToken == address(0)){
+            assetToken = address(wrapToken);
+            purchaseAmount = msg.value;
+        }else{
+            require(msg.value == 0,"msg.value error");
+        }
+        require(purchaseAmount > _lunachMsg.fee, "purchaseAmount error");
+        uint256 initialPurchase = (purchaseAmount - _lunachMsg.fee);
+        if(purchaseToken == address(0)){
+            payable(feeTo).transfer(_lunachMsg.fee);
+            wrapToken.deposit{value: initialPurchase}();
+        }else{
+            require(
+                IERC20(assetToken).balanceOf(msg.sender) >= purchaseAmount,
+                "Insufficient amount"
+            );
+            IERC20(assetToken).safeTransferFrom(msg.sender, feeTo, fee);
+            IERC20(assetToken).safeTransferFrom(
+                msg.sender,
+                address(this),
+                initialPurchase
+            );
+        }
 
+        IAgentToken token = IAgentToken(Clones.clone(agentTokenImpl));
+        tokenMsg[address(token)].gradThreshold = gradThreshold;
         address _pair = factory.createPair(address(token), assetToken);
         string memory name = string.concat(_name, " by NetMind XYZ");
         agentFactory.newApplication(
@@ -462,17 +501,14 @@ contract Bonding is
         IOwnable(address(token)).renounceOwnership();
         uint256 supply = token.totalSupply();
         token.approve(address(router), supply);
-        uint256 k = ((K * 10000) / assetRate);
-        uint256 liquidity = ((k * 10000 ether) * 1 ether / supply)  / 10000;
-
-        router.addInitialLiquidity(address(token), supply, liquidity);
+        router.addInitialLiquidity(address(token), assetToken, supply, _lunachMsg.initSupply);
 
         Data memory _data = Data({
             token: address(token),
             name: name,
             ticker: _ticker,
             supply: supply,
-            marketCap: liquidity,
+            marketCap: _lunachMsg.initSupply,
             price: IFPair(_pair).priceBLast()
         });
         Token memory tmpToken = Token({
@@ -510,9 +546,9 @@ contract Bonding is
     ) public{
         require(getTradeSta(), "sender error");
         require(tokenInfo[tokenAddress].trading, "Token not trading");
-        (, uint256 amountOut) = router.sell(amountIn, tokenAddress, msg.sender );
+        address pairAddress = tokenInfo[tokenAddress].pair;
+        (, uint256 amountOut) = router.sell(amountIn, pairAddress, msg.sender );
         require(amountOut >= amountOutMin, "amountOutMin error");
-        address pairAddress = factory.getPair(tokenAddress, router.assetToken());
         tokenInfo[tokenAddress].data.price = IFPair(pairAddress).priceBLast();
     }
 
@@ -520,16 +556,25 @@ contract Bonding is
         uint256 amountIn,
         uint256 amountOutMin,
         address tokenAddress
-    ) public{
+    ) public payable{
         require(getTradeSta(), "sender error");
-        require(amountIn <= purchaseLimit, "purchaseLimit error");
         require(tokenInfo[tokenAddress].trading, "Token not trading");
-        (, uint256 amountOut) = router.buy(amountIn, tokenAddress, msg.sender );
+        address pairAddress = tokenInfo[tokenAddress].pair;
+        uint256 amountOut;
+        if(IFPair(pairAddress).tokenB() == address(wrapToken)){
+            amountIn = msg.value;
+            wrapToken.deposit{value: amountIn}();
+            wrapToken.approve(address(router), amountIn);
+            (, amountOut) = router.buy(amountIn, pairAddress, address(this));
+            IERC20(tokenAddress).transfer(msg.sender, amountOut);
+        }else{
+            require(msg.value == 0,"msg.value error");
+            (, amountOut) = router.buy(amountIn, pairAddress, msg.sender );
+        }
         require(amountOut >= amountOutMin, "amountOutMin error");
-        address pairAddress = factory.getPair(tokenAddress, router.assetToken());
-        (uint256 reserveA, ) = IFPair(pairAddress).getReserves();
+        (, uint256 reserveB) = IFPair(pairAddress).getReserves();
         tokenInfo[tokenAddress].data.price = IFPair(pairAddress).priceBLast();
-        if (reserveA <= gradThreshold && tokenInfo[tokenAddress].trading) {
+        if (reserveB >= tokenMsg[tokenAddress].gradThreshold  && tokenInfo[tokenAddress].trading) {
             _openTradingOnUniswap(tokenAddress);
         }
     }
@@ -553,7 +598,7 @@ contract Bonding is
 
         _token.trading = false;
         _token.tradingOnUniswap = true;
-        address assetToken = router.assetToken();
+        address assetToken = IFPair(tokenInfo[tokenAddress].pair).tokenB();
         router.graduate(tokenAddress);
         address lp = _addInitialLiquidity(token_, IERC20(assetToken));
         agentFactory.graduate(address(token_), lp);

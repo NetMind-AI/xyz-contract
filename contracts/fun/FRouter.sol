@@ -21,6 +21,7 @@ contract FRouter is
     bytes32 public constant EXECUTOR_ROLE = keccak256("EXECUTOR_ROLE");
 
     FFactory public factory;
+    address public bonding;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -35,9 +36,14 @@ contract FRouter is
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
 
         require(factory_ != address(0), "Zero addresses are not allowed.");
-    
+
         factory = FFactory(factory_);
     }
+
+    function setBonding(address bonding_) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        bonding = bonding_;
+    }
+
 
     function getAmountsOut(
         address tokenIn,
@@ -50,7 +56,7 @@ contract FRouter is
         if (pairAddress == address(0)){
             pairAddress = factory.getPair(tokenOut, tokenIn);
         }
-         
+
         IFPair pair = IFPair(pairAddress);
 
         (uint256 reserveA, uint256 reserveB) = pair.getReserves();
@@ -163,7 +169,7 @@ contract FRouter is
         require(pairAddress != address(0), "Zero addresses are not allowed.");
 
         IFPair pair = IFPair(pairAddress);
-       
+
         uint256 assetBalance = pair.assetBalance();
         pair.transferAsset(msg.sender, assetBalance);
         uint256 balance = pair.balance();

@@ -6,6 +6,8 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import "../interface/IFPair.sol";
+import "../interface/IBonding.sol";
+import {IFRouter, IWrapToken} from "../interface/IInterface.sol";
 
 contract FPair is IFPair, ReentrancyGuard {
     using SafeERC20 for IERC20;
@@ -27,7 +29,7 @@ contract FPair is IFPair, ReentrancyGuard {
         require(router_ != address(0), "Zero addresses are not allowed.");
         require(token0 != address(0), "Zero addresses are not allowed.");
         require(token1 != address(0), "Zero addresses are not allowed.");
-
+        require(IBonding(IFRouter(router).bonding()).wrapToken() != address(0), "not wrapToken ");
         router = router_;
         tokenA = token0;
         tokenB = token1;
@@ -107,8 +109,12 @@ contract FPair is IFPair, ReentrancyGuard {
         uint256 amount
     ) public onlyRouter {
         require(recipient != address(0), "Zero addresses are not allowed.");
-
-        IERC20(tokenB).safeTransfer(recipient, amount);
+        if(IBonding(IFRouter(router).bonding()).wrapToken() == tokenB){
+            IWrapToken(tokenB).withdraw(amount);
+            payable(recipient).transfer(amount);
+        }else{
+            IERC20(tokenB).safeTransfer(recipient, amount);
+        }
     }
 
     function transferTo(address recipient, uint256 amount) public onlyRouter {
