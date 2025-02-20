@@ -234,7 +234,7 @@ contract QueryData is OwnableUpgradeable{
             (uint256 tokenBal_, uint256 assetBal) = fpair.getReserves();
             tokenBal = tokenBal_;
             assetTokenBal = IERC20(fpair.tokenB()).balanceOf(address(fpair));
-            (, , , , assetTokenTotal)= getNmtTotal(threshold, token);
+            assetTokenTotal= getNmtTotal(threshold, token);
             status = true;
         }else{
             (governorToken, governor, timelock, pair,)= bonding.tokenMsg(token);
