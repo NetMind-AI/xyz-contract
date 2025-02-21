@@ -377,6 +377,10 @@ contract Bonding is
         return lunachMsg[token];
     }
 
+    function getFpair(address token) public view returns (address) {
+        return tokenInfo[token].pair;
+    }
+
     function getGovernorMsg() public view returns (address, address, address, address) {
         return (
             governorTokenImpl,

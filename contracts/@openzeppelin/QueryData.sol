@@ -8,39 +8,13 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
 interface IBonding {
-    struct Token {
-        address creator;
-        address agentToken;
-        address pair;
-        Data data;
-        string description;
-        string image;
-        string twitter;
-        string telegram;
-        string youtube;
-        string website;
-        string keyHash;
-        bool trading;
-        bool tradingOnUniswap;
-        string motivation;
-        string model;
-    }
-
-    struct Data {
-        address token;
-        string name;
-        string ticker;
-        uint256 supply;
-        uint256 marketCap;
-        uint256 price;
-    }
     function wrapToken() external view returns (address);
     function router() external view returns (address);
     function uniswapRouter() external view returns (address);
     function gradThreshold() external view returns (uint256);
     function tokenMsg(address token) external view returns (address, address, address, address, uint256);
-    function lunachMsg(address token) external view returns (uint256, uint256, uint256, uint256);
-    function tokenInfo(address token) external view returns (Token memory);
+    function getLunachMsg(address token) external view returns (uint256, uint256, uint256, uint256);
+    function getFpair(address token) external view returns (address);
 }
 
 interface IAgentToken {
@@ -78,7 +52,7 @@ contract QueryData is OwnableUpgradeable{
     IFFactory public fFactory;
     address public nmtToken;
     IUniswapV2Pair public nmtPair;
-    mapping(address => address) public assetTokenPair;
+    mapping(address => address) private assetTokenPair;
 
     struct Data {
         uint256 price;
@@ -112,10 +86,10 @@ contract QueryData is OwnableUpgradeable{
     function setAssetTokenPair(address[] memory assetTokens, address[] memory assetTokenPairs) public onlyOwner(){
         address assetToken;
         address assetPair;
-        for (uint256 i = 0; i <= assetTokens.length; i++) {
+        for (uint256 i = 0; i < assetTokens.length; i++) {
             assetToken = assetTokens[i];
             if(assetToken == address(0))assetToken = bonding.wrapToken();
-            (uint256 initSupply, , , ) = bonding.lunachMsg(assetToken);
+            (uint256 initSupply, , , ) = bonding.getLunachMsg(assetToken);
             require(initSupply > 0, "assetToken err");
             assetPair = assetTokenPairs[i];
             require(IUniswapV2Pair(assetPair).token0() == assetToken || IUniswapV2Pair(assetPair).token1() == assetToken
@@ -135,7 +109,7 @@ contract QueryData is OwnableUpgradeable{
         if(status){
             data.fTokenBal = tokenBal;
             data.fNmtTokenBal = assetTokenBal;
-            IFPair fpair = IFPair(bonding.tokenInfo(token).pair);
+            IFPair fpair = IFPair(bonding.getFpair(token));
             threshold = fpair.kLast() / assetTokenTotal;
             if(threshold < tokenBal){
                 data.offsetToken = tokenBal - threshold;
@@ -192,7 +166,7 @@ contract QueryData is OwnableUpgradeable{
             if(status){
                 fTokenBals[i] = tokenBal;
                 fNmtTokenBals[i] = assetTokenBal;
-                IFPair fpair = IFPair(bonding.tokenInfo(tokens[i]).pair);
+                IFPair fpair = IFPair(bonding.getFpair(tokens[i]));
                 threshold = fpair.kLast() / assetTokenTotal;
                 if(threshold < tokenBal){
                     offsetTokens[i] = tokenBal - threshold;
@@ -230,7 +204,7 @@ contract QueryData is OwnableUpgradeable{
         address[] memory tokens = new address[](1);
         tokens[0] = token;
         if(liquidityPools.length ==0){
-            IFPair fpair = IFPair(bonding.tokenInfo(token).pair);
+            IFPair fpair = IFPair(bonding.getFpair(token));
             (uint256 tokenBal_, uint256 assetBal) = fpair.getReserves();
             tokenBal = tokenBal_;
             assetTokenBal = assetBal;
@@ -264,7 +238,7 @@ contract QueryData is OwnableUpgradeable{
             token = tokens[i];
             IAgentToken agentToken = IAgentToken(token);
             address[] memory liquidityPools = agentToken.liquidityPools();
-            IFPair fpair = IFPair(bonding.tokenInfo(token).pair);
+            IFPair fpair = IFPair(bonding.getFpair(token));
             if(liquidityPools.length ==0){
                 (uint256 tokenBal, uint256 assetBal) = fpair.getReserves();
                 uint256 decimals1 = 18 - IERC20Metadata(fpair.tokenB()).decimals();
@@ -298,10 +272,15 @@ contract QueryData is OwnableUpgradeable{
         }
     }
 
+    function getAssetTokenPair(address token) public view returns (address) {
+        if(token == address(0))token = bonding.wrapToken();
+        return assetTokenPair[token];
+    }
+
     function getNmtTotal(uint256 threshold, address token) public view returns(uint256){
         (, , , , uint256 assetTokenTotal)= bonding.tokenMsg(token);
         if(assetTokenTotal == 0){
-            IFPair fpair = IFPair(bonding.tokenInfo(token).pair);
+            IFPair fpair = IFPair(bonding.getFpair(token));
             uint256 reserveA = IERC20(token).totalSupply();
             uint256 reserveB = fpair.kLast() / reserveA;
             return calculateAmountIn(uint128(reserveA), uint128(reserveB), uint128(reserveA) - uint128(threshold), fpair.kLast());
