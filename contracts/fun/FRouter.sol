@@ -111,25 +111,6 @@ contract FRouter is
         return (amountA, amountB);
     }
 
-    function addInitialLiquidityWithEth(
-        address tokenA,
-        uint256 amountA,
-        uint256 amountB
-    ) public payable onlyRole(EXECUTOR_ROLE) returns (uint256, uint256) {
-        require(tokenA != address(0), "Zero addresses are not allowed.");
-        require(amountB == msg.value, "value error");
-
-        address pairAddress = factory.getPair(tokenA, address(weth));
-        IERC20(tokenA).safeTransferFrom(msg.sender, pairAddress, amountA);
-
-        weth.deposit{value: amountB}();
-        weth.transfer(pairAddress, amountB);
-
-        IFPair(pairAddress).mint(amountA, amountB);
-
-        return (amountA, amountB);
-    }
-
     function sell(
         uint256 amountIn,
         address pairAddress,

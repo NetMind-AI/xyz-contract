@@ -60,7 +60,7 @@ contract Bonding is
     mapping(address => ProposeMsg) private proposeMsg;
     uint256 public purchaseLimit;
     bool public buySta;
-    IWrapToken public wrapToken;
+    address public weth;
     mapping(address => LunachMsg) private lunachMsg;
 
     struct LunachMsg{
@@ -174,9 +174,9 @@ contract Bonding is
         defaultDelegatee = newDelegatee;
     }
 
-    function setWrapToken(address wrapToken_) public onlyOwner {
-        require(wrapToken_ != address(0), "wrapToken err");
-        wrapToken = IWrapToken(wrapToken_);
+    function setWeth(address weth_) public onlyOwner {
+        require(weth_ != address(0), "weth err");
+        weth = weth_;
     }
 
     function addBlockedWord(string[] memory words) public onlyOwner {
@@ -224,8 +224,8 @@ contract Bonding is
     ) public onlyOwner {
         require(lowerLimit <= upperLimit, "upperLimit err");
         if(token == address(0)){
-            require(address(wrapToken) != address(0), "wrapToken err");
-            token = address(wrapToken);
+            require(weth != address(0), "weth err");
+            token = weth;
         }
         lunachMsg[token] = LunachMsg(initSupply, lunachfee, upperLimit, lowerLimit);
     }
@@ -373,7 +373,7 @@ contract Bonding is
     }
 
     function getLunachMsg(address token) public view returns (LunachMsg memory) {
-        if(token == address(0))token = address(wrapToken);
+        if(token == address(0))token = weth;
         return lunachMsg[token];
     }
 
@@ -454,7 +454,7 @@ contract Bonding is
     ) public payable nonReentrant {
         address assetToken = assetToken_;
         if(assetToken_ == address(0)){
-            assetToken = address(wrapToken);
+            assetToken = weth;
             purchaseAmount = msg.value;
         }else{
             require(msg.value == 0,"msg.value error");
@@ -506,6 +506,7 @@ contract Bonding is
         IOwnable(address(token)).renounceOwnership();
         uint256 supply = token.totalSupply();
         token.approve(address(router), supply);
+
         router.addInitialLiquidity(address(token), assetToken, supply, _lunachMsg.initSupply);
 
         Data memory _data = Data({
@@ -539,7 +540,7 @@ contract Bonding is
         emit UpdateTokenMsg(address(token), desc, model, urls[0], urls[1], urls[2], urls[3], urls[4], motivation, 0, '');
 
         // Make initial purchase
-        if(IFPair(_pair).tokenB() == address(wrapToken)){
+        if(IFPair(_pair).tokenB() == weth){
             router.buyWithETH{value: initialPurchase}(initialPurchase, _pair, msg.sender);
         }else{
             IERC20(assetToken).forceApprove(address(router), initialPurchase);
@@ -559,7 +560,7 @@ contract Bonding is
         require(tokenInfo[tokenAddress].trading, "Token not trading");
         address pairAddress = tokenInfo[tokenAddress].pair;
         uint256 amountOut;
-        if(IFPair(pairAddress).tokenB() == address(wrapToken)){
+        if(IFPair(pairAddress).tokenB() == weth){
             (, amountOut) = router.sellForETH(amountIn, pairAddress, msg.sender);
         }else{
             (, amountOut) = router.sell(amountIn, pairAddress, msg.sender);
@@ -577,7 +578,7 @@ contract Bonding is
         require(tokenInfo[tokenAddress].trading, "Token not trading");
         address pairAddress = tokenInfo[tokenAddress].pair;
         uint256 amountOut;
-        if(IFPair(pairAddress).tokenB() == address(wrapToken)){
+        if(IFPair(pairAddress).tokenB() == weth){
             amountIn = msg.value;
             (, amountOut) = router.buyWithETH{value: amountIn}(amountIn, pairAddress, msg.sender);
             IERC20(tokenAddress).transfer(msg.sender, amountOut);
