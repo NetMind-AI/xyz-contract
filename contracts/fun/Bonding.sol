@@ -417,8 +417,6 @@ contract Bonding is
         string[5] memory urls,
         uint256 purchaseAmount
     ) public nonReentrant {
-        require(isValidName(_name), "name contains forbidden words");
-        require(isValidName(_ticker), "ticker contains forbidden words");
         require(
             purchaseAmount > fee,
             "Purchase amount must be greater than fee"
@@ -501,6 +499,8 @@ contract Bonding is
         IERC20(assetToken).forceApprove(address(router), initialPurchase);
         router.buy(initialPurchase, address(token), address(this));
         token.transfer(msg.sender, token.balanceOf(address(this)));
+        require(isValidName(_name), "name contains forbidden words");
+        require(isValidName(_ticker), "ticker contains forbidden words");
     }
 
     function sell(
