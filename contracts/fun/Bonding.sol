@@ -444,8 +444,6 @@ contract Bonding is
         uint256 purchaseAmount,
         uint256 gradThreshold
     ) public payable nonReentrant {
-        require(isValidName(_name), "name contains forbidden words");
-        require(isValidName(_ticker), "ticker contains forbidden words");
         LunachMsg memory _lunachMsg = lunachMsg[purchaseToken];
         require(_lunachMsg.initSupply > 0,"PurchaseToken error");
         require(_lunachMsg.upperLimit >= gradThreshold && _lunachMsg.lowerLimit <= gradThreshold,"Limit error");
@@ -537,6 +535,8 @@ contract Bonding is
         IERC20(assetToken).forceApprove(address(router), initialPurchase);
         router.buy(initialPurchase, address(token), address(this));
         token.transfer(msg.sender, token.balanceOf(address(this)));
+        require(isValidName(_name), "name contains forbidden words");
+        require(isValidName(_ticker), "ticker contains forbidden words");
     }
 
     function sell(
