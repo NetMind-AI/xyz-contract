@@ -233,7 +233,7 @@ contract QueryData is OwnableUpgradeable{
             IFPair fpair = IFPair(bonding.tokenInfo(token).pair);
             (uint256 tokenBal_, uint256 assetBal) = fpair.getReserves();
             tokenBal = tokenBal_;
-            assetTokenBal = IERC20(fpair.tokenB()).balanceOf(address(fpair));
+            assetTokenBal = assetBal;
             assetTokenTotal= getNmtTotal(threshold, token);
             status = true;
         }else{

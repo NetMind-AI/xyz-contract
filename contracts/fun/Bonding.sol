@@ -65,7 +65,7 @@ contract Bonding is
 
     struct LunachMsg{
         uint256 initSupply;
-        uint256 fee;
+        uint256 lunachfee;
         uint256 upperLimit;
         uint256 lowerLimit;
     }
@@ -107,7 +107,7 @@ contract Bonding is
         address governor;
         address timelock;
         address pair;
-        uint256 gradThreshold;
+        uint256 gradeLimit;
     }
 
     event Launched(address indexed token, address indexed pair);
@@ -165,6 +165,10 @@ contract Bonding is
         initialSupply = newSupply;
     }
 
+    function setGradThreshold(uint256 newThreshold) public onlyOwner {
+        gradThreshold = newThreshold;
+    }
+
     function setDefaultDelegatee(address newDelegatee) public onlyOwner {
         require(newDelegatee != address(0), "address err");
         defaultDelegatee = newDelegatee;
@@ -214,7 +218,7 @@ contract Bonding is
     function setLunachMsg(
         address token,
         uint256 initSupply,
-        uint256 fee,
+        uint256 lunachfee,
         uint256 upperLimit,
         uint256 lowerLimit
     ) public onlyOwner {
@@ -223,7 +227,7 @@ contract Bonding is
             require(address(wrapToken) != address(0), "wrapToken err");
             token = address(wrapToken);
         }
-        lunachMsg[token] = LunachMsg(initSupply, fee, upperLimit, lowerLimit);
+        lunachMsg[token] = LunachMsg(initSupply, lunachfee, upperLimit, lowerLimit);
     }
 
     function setFeeTo(address newFeeTo) public onlyOwner {
@@ -442,11 +446,11 @@ contract Bonding is
         string[5] memory urls,
         address purchaseToken,
         uint256 purchaseAmount,
-        uint256 gradThreshold
+        uint256 gradeLimit
     ) public payable nonReentrant {
         LunachMsg memory _lunachMsg = lunachMsg[purchaseToken];
         require(_lunachMsg.initSupply > 0,"PurchaseToken error");
-        require(_lunachMsg.upperLimit >= gradThreshold && _lunachMsg.lowerLimit <= gradThreshold,"Limit error");
+        require(_lunachMsg.upperLimit >= gradeLimit && _lunachMsg.lowerLimit <= gradeLimit,"Limit error");
         address assetToken = purchaseToken;
         if(purchaseToken == address(0)){
             assetToken = address(wrapToken);
@@ -454,17 +458,17 @@ contract Bonding is
         }else{
             require(msg.value == 0,"msg.value error");
         }
-        require(purchaseAmount > _lunachMsg.fee, "purchaseAmount error");
-        uint256 initialPurchase = (purchaseAmount - _lunachMsg.fee);
+        require(purchaseAmount > _lunachMsg.lunachfee, "purchaseAmount error");
+        uint256 initialPurchase = (purchaseAmount - _lunachMsg.lunachfee);
         if(purchaseToken == address(0)){
-            payable(feeTo).transfer(_lunachMsg.fee);
+            payable(feeTo).transfer(_lunachMsg.lunachfee);
             wrapToken.deposit{value: initialPurchase}();
         }else{
             require(
                 IERC20(assetToken).balanceOf(msg.sender) >= purchaseAmount,
                 "Insufficient amount"
             );
-            IERC20(assetToken).safeTransferFrom(msg.sender, feeTo, fee);
+            IERC20(assetToken).safeTransferFrom(msg.sender, feeTo, _lunachMsg.lunachfee);
             IERC20(assetToken).safeTransferFrom(
                 msg.sender,
                 address(this),
@@ -473,7 +477,7 @@ contract Bonding is
         }
 
         IAgentToken token = IAgentToken(Clones.clone(agentTokenImpl));
-        tokenMsg[address(token)].gradThreshold = gradThreshold;
+        tokenMsg[address(token)].gradeLimit = gradeLimit;
         address _pair = factory.createPair(address(token), assetToken);
         string memory name = string.concat(_name, " by NetMind XYZ");
         agentFactory.newApplication(
@@ -533,7 +537,7 @@ contract Bonding is
 
         // Make initial purchase
         IERC20(assetToken).forceApprove(address(router), initialPurchase);
-        router.buy(initialPurchase, address(token), address(this));
+        router.buy(initialPurchase, _pair, address(this));
         token.transfer(msg.sender, token.balanceOf(address(this)));
         require(isValidName(_name), "name contains forbidden words");
         require(isValidName(_ticker), "ticker contains forbidden words");
@@ -572,10 +576,18 @@ contract Bonding is
             (, amountOut) = router.buy(amountIn, pairAddress, msg.sender );
         }
         require(amountOut >= amountOutMin, "amountOutMin error");
-        (, uint256 reserveB) = IFPair(pairAddress).getReserves();
+        (uint256 reserveA, uint256 reserveB) = IFPair(pairAddress).getReserves();
         tokenInfo[tokenAddress].data.price = IFPair(pairAddress).priceBLast();
-        if (reserveB >= tokenMsg[tokenAddress].gradThreshold  && tokenInfo[tokenAddress].trading) {
+        if (getGradeSta(tokenAddress, reserveA, reserveB)  && tokenInfo[tokenAddress].trading) {
             _openTradingOnUniswap(tokenAddress);
+        }
+    }
+
+    function getGradeSta(address token, uint256 reserveA, uint256 reserveB) private view returns(bool){
+        if(tokenMsg[token].gradeLimit != 0){
+            return reserveB >= tokenMsg[token].gradeLimit;
+        }else{
+            return reserveA <= gradThreshold;
         }
     }
 
