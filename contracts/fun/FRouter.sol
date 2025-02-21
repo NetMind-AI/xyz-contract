@@ -10,6 +10,13 @@ import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol
 import "./FFactory.sol";
 import "../interface/IFPair.sol";
 
+interface IWETH {
+    function deposit() external payable;
+    function withdraw(uint wad) external;
+    function approve(address guy, uint wad) external returns (bool);
+    function transfer(address dst, uint wad) external returns (bool);
+}
+
 contract FRouter is
     Initializable,
     AccessControlUpgradeable,
@@ -20,8 +27,8 @@ contract FRouter is
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
     bytes32 public constant EXECUTOR_ROLE = keccak256("EXECUTOR_ROLE");
 
-    FFactory public factory;
-    address public bonding;
+    FFactory  public factory;
+    IWETH     public weth;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -29,21 +36,24 @@ contract FRouter is
     }
 
     function initialize(
-        address factory_
+        address factory_,
+        address weth_
     ) external initializer {
         __ReentrancyGuard_init();
         __AccessControl_init();
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
 
         require(factory_ != address(0), "Zero addresses are not allowed.");
+        require(weth_ != address(0), "Zero addresses are not allowed.");
 
         factory = FFactory(factory_);
+        weth = IWETH(weth);
     }
 
-    function setBonding(address bonding_) public onlyRole(DEFAULT_ADMIN_ROLE) {
-        bonding = bonding_;
+    function setWeth(address weth_) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(weth_ != address(0), "wrapToken err");
+        weth = IWETH(weth_);
     }
-
 
     function getAmountsOut(
         address tokenIn,
@@ -101,6 +111,25 @@ contract FRouter is
         return (amountA, amountB);
     }
 
+    function addInitialLiquidityWithEth(
+        address tokenA,
+        uint256 amountA,
+        uint256 amountB
+    ) public payable onlyRole(EXECUTOR_ROLE) returns (uint256, uint256) {
+        require(tokenA != address(0), "Zero addresses are not allowed.");
+        require(amountB == msg.value, "value error");
+
+        address pairAddress = factory.getPair(tokenA, address(weth));
+        IERC20(tokenA).safeTransferFrom(msg.sender, pairAddress, amountA);
+
+        weth.deposit{value: amountB}();
+        weth.transfer(pairAddress, amountB);
+
+        IFPair(pairAddress).mint(amountA, amountB);
+
+        return (amountA, amountB);
+    }
+
     function sell(
         uint256 amountIn,
         address pairAddress,
@@ -112,8 +141,9 @@ contract FRouter is
         IFPair pair = IFPair(pairAddress);
 
         address tokenAddress = pair.tokenA();
+        address assetToken = pair.tokenB();
 
-        uint256 amountOut = getAmountsOut(tokenAddress, address(0), amountIn);
+        uint256 amountOut = getAmountsOut(assetToken, tokenAddress, amountIn);
 
         IERC20(tokenAddress).safeTransferFrom(to, pairAddress, amountIn);
 
@@ -124,6 +154,43 @@ contract FRouter is
         address feeTo = factory.taxVault();
 
         pair.transferAsset(to, amount);
+        pair.transferAsset(feeTo, txFee);
+
+        pair.swap(amountIn, 0, 0, amountOut);
+
+        return (amountIn, amountOut);
+    }
+
+
+    function sellForETH(
+        uint256 amountIn,
+        address pairAddress,
+        address to
+    ) public nonReentrant onlyRole(EXECUTOR_ROLE) returns (uint256, uint256) {
+        require(pairAddress != address(0), "Zero addresses are not allowed.");
+        require(to != address(0), "Zero addresses are not allowed.");
+
+        IFPair pair = IFPair(pairAddress);
+
+        address tokenAddress = pair.tokenA();
+        address assetToken = pair.tokenB();
+
+        uint256 amountOut = getAmountsOut(assetToken, tokenAddress, amountIn);
+
+        IERC20(tokenAddress).safeTransferFrom(to, pairAddress, amountIn);
+
+        uint fee = factory.sellTax();
+        uint256 txFee = (fee * amountOut) / 100;
+
+        uint256 amount = amountOut - txFee;
+        address feeTo = factory.taxVault();
+
+
+        pair.transferAsset(address(this), amount);
+        weth.withdraw(amount);
+        require(address(this).balance >= amount, "Insufficient balance");
+        payable(to).transfer(amount);
+
         pair.transferAsset(feeTo, txFee);
 
         pair.swap(amountIn, 0, 0, amountOut);
@@ -151,6 +218,39 @@ contract FRouter is
         address assetToken = pair.tokenB();
 
         IERC20(assetToken).safeTransferFrom(to, pairAddress, amount);
+
+        IERC20(assetToken).safeTransferFrom(to, feeTo, txFee);
+
+        uint256 amountOut = getAmountsOut(tokenAddress, assetToken, amount);
+
+        pair.transferTo(to, amountOut);
+
+        pair.swap(0, amountOut, amount, 0);
+
+        return (amount, amountOut);
+    }
+
+    function buyWithETH(
+        uint256 amountIn,
+        address pairAddress,
+        address to
+    ) public payable onlyRole(EXECUTOR_ROLE) nonReentrant returns (uint256, uint256) {
+        require(pairAddress != address(0), "Zero addresses are not allowed.");
+        require(to != address(0), "Zero addresses are not allowed.");
+        require(amountIn > 0 && msg.value == amountIn, "amountIn must be greater than 0 ");
+
+        IFPair pair = IFPair(pairAddress);
+
+        uint fee = factory.buyTax();
+        uint256 txFee = (fee * amountIn) / 100;
+        address feeTo = factory.taxVault();
+
+        uint256 amount = amountIn - txFee;
+        address tokenAddress = pair.tokenA();
+        address assetToken = pair.tokenB();
+
+        weth.deposit{value: msg.value}();
+        weth.transfer(pairAddress, amount);
 
         IERC20(assetToken).safeTransferFrom(to, feeTo, txFee);
 

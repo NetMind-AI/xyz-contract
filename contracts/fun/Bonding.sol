@@ -448,25 +448,24 @@ contract Bonding is
         string memory motivation,
         string memory img,
         string[5] memory urls,
-        address purchaseToken,
+        address assetToken_,
         uint256 purchaseAmount,
         uint256 gradeLimit
     ) public payable nonReentrant {
-        LunachMsg memory _lunachMsg = lunachMsg[purchaseToken];
-        require(_lunachMsg.initSupply > 0,"PurchaseToken error");
-        require(_lunachMsg.upperLimit >= gradeLimit && _lunachMsg.lowerLimit <= gradeLimit,"Limit error");
-        address assetToken = purchaseToken;
-        if(purchaseToken == address(0)){
+        address assetToken = assetToken_;
+        if(assetToken_ == address(0)){
             assetToken = address(wrapToken);
             purchaseAmount = msg.value;
         }else{
             require(msg.value == 0,"msg.value error");
         }
+        LunachMsg memory _lunachMsg = lunachMsg[assetToken];
+        require(_lunachMsg.initSupply > 0,"PurchaseToken error");
+        require(_lunachMsg.upperLimit >= gradeLimit && _lunachMsg.lowerLimit <= gradeLimit,"Limit error");
         require(purchaseAmount > _lunachMsg.lunachfee, "purchaseAmount error");
         uint256 initialPurchase = (purchaseAmount - _lunachMsg.lunachfee);
-        if(purchaseToken == address(0)){
+        if(assetToken_ == address(0)){
             payable(feeTo).transfer(_lunachMsg.lunachfee);
-            wrapToken.deposit{value: initialPurchase}();
         }else{
             require(
                 IERC20(assetToken).balanceOf(msg.sender) >= purchaseAmount,
@@ -540,9 +539,13 @@ contract Bonding is
         emit UpdateTokenMsg(address(token), desc, model, urls[0], urls[1], urls[2], urls[3], urls[4], motivation, 0, '');
 
         // Make initial purchase
-        IERC20(assetToken).forceApprove(address(router), initialPurchase);
-        router.buy(initialPurchase, _pair, address(this));
-        token.transfer(msg.sender, token.balanceOf(address(this)));
+        if(IFPair(_pair).tokenB() == address(wrapToken)){
+            router.buyWithETH{value: initialPurchase}(initialPurchase, _pair, msg.sender);
+        }else{
+            IERC20(assetToken).forceApprove(address(router), initialPurchase);
+            (, uint256 amountOut) = router.buy(initialPurchase, _pair, address(this));
+            token.transfer(msg.sender, amountOut);
+        }
         require(isValidName(_name), "name contains forbidden words");
         require(isValidName(_ticker), "ticker contains forbidden words");
     }
@@ -555,7 +558,12 @@ contract Bonding is
         require(getTradeSta(), "sender error");
         require(tokenInfo[tokenAddress].trading, "Token not trading");
         address pairAddress = tokenInfo[tokenAddress].pair;
-        (, uint256 amountOut) = router.sell(amountIn, pairAddress, msg.sender );
+        uint256 amountOut;
+        if(IFPair(pairAddress).tokenB() == address(wrapToken)){
+            (, amountOut) = router.sellForETH(amountIn, pairAddress, msg.sender);
+        }else{
+            (, amountOut) = router.sell(amountIn, pairAddress, msg.sender);
+        }
         require(amountOut >= amountOutMin, "amountOutMin error");
         tokenInfo[tokenAddress].data.price = IFPair(pairAddress).priceBLast();
     }
@@ -571,9 +579,7 @@ contract Bonding is
         uint256 amountOut;
         if(IFPair(pairAddress).tokenB() == address(wrapToken)){
             amountIn = msg.value;
-            wrapToken.deposit{value: amountIn}();
-            wrapToken.approve(address(router), amountIn);
-            (, amountOut) = router.buy(amountIn, pairAddress, address(this));
+            (, amountOut) = router.buyWithETH{value: amountIn}(amountIn, pairAddress, msg.sender);
             IERC20(tokenAddress).transfer(msg.sender, amountOut);
         }else{
             require(msg.value == 0,"msg.value error");
