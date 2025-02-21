@@ -136,7 +136,7 @@ contract QueryData is OwnableUpgradeable{
             data.fTokenBal = tokenBal;
             data.fNmtTokenBal = assetTokenBal;
             IFPair fpair = IFPair(bonding.tokenInfo(token).pair);
-            uint256 threshold = fpair.kLast() / assetTokenTotal;
+            threshold = fpair.kLast() / assetTokenTotal;
             if(threshold < tokenBal){
                 data.offsetToken = tokenBal - threshold;
             }
@@ -193,7 +193,7 @@ contract QueryData is OwnableUpgradeable{
                 fTokenBals[i] = tokenBal;
                 fNmtTokenBals[i] = assetTokenBal;
                 IFPair fpair = IFPair(bonding.tokenInfo(tokens[i]).pair);
-                uint256 threshold = fpair.kLast() / assetTokenTotal;
+                threshold = fpair.kLast() / assetTokenTotal;
                 if(threshold < tokenBal){
                     offsetTokens[i] = tokenBal - threshold;
                 }
