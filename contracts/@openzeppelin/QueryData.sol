@@ -8,7 +8,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
 interface IBonding {
-    function wrapToken() external view returns (address);
+    function weth() external view returns (address);
     function router() external view returns (address);
     function uniswapRouter() external view returns (address);
     function gradThreshold() external view returns (uint256);
@@ -89,7 +89,7 @@ contract QueryData is OwnableUpgradeable{
         address assetPair;
         for (uint256 i = 0; i < assetTokens.length; i++) {
             assetToken = assetTokens[i];
-            if(assetToken == address(0))assetToken = bonding.wrapToken();
+            if(assetToken == address(0))assetToken = bonding.weth();
             (uint256 initSupply, , , ) = bonding.getLunachMsg(assetToken);
             require(initSupply > 0, "assetToken err");
             assetPair = assetTokenPairs[i];
