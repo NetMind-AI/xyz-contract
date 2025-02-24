@@ -9,13 +9,7 @@ import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol
 
 import "./FFactory.sol";
 import "../interface/IFPair.sol";
-
-interface IWETH {
-    function deposit() external payable;
-    function withdraw(uint wad) external;
-    function approve(address guy, uint wad) external returns (bool);
-    function transfer(address dst, uint wad) external returns (bool);
-}
+import {IWETH} from "../interface/IInterface.sol";
 
 contract FRouter is
     Initializable,
@@ -232,8 +226,7 @@ contract FRouter is
 
         weth.deposit{value: msg.value}();
         weth.transfer(pairAddress, amount);
-
-        IERC20(assetToken).safeTransferFrom(to, feeTo, txFee);
+        weth.transfer(feeTo, txFee);
 
         uint256 amountOut = getAmountsOut(tokenAddress, assetToken, amount);
 
@@ -266,5 +259,8 @@ contract FRouter is
         require(spender != address(0), "Zero addresses are not allowed.");
 
         IFPair(pair).approval(spender, asset, amount);
+    }
+
+    fallback() external payable{
     }
 }

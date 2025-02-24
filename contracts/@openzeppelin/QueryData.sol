@@ -14,7 +14,7 @@ interface IBonding {
     function gradThreshold() external view returns (uint256);
     function tokenMsg(address token) external view returns (address, address, address, address, uint256);
     function getLunachMsg(address token) external view returns (uint256, uint256, uint256, uint256);
-    function getFpair(address token) external view returns (address);
+    function getFpair(address token) external view returns (address, uint256);
 }
 
 interface IAgentToken {
@@ -68,6 +68,7 @@ contract QueryData is OwnableUpgradeable{
         address governorToken;
         address governor;
         address timelock;
+        address assetToken;
     }
 
     constructor() {
@@ -106,11 +107,13 @@ contract QueryData is OwnableUpgradeable{
         uint256 assetTokenTotal;
         bool status;
         (data.price, data.totalValue, tokenBal, assetTokenBal, assetTokenTotal, status, data.pair, data.governorToken, data.governor, data.timelock) = getTokenData(threshold, token);
+        (address pairAddr, uint256 initAmount) = bonding.getFpair(token);
+        IFPair fpair = IFPair(pairAddr);
+        data.assetToken = fpair.tokenB();
         if(status){
             data.fTokenBal = tokenBal;
             data.fNmtTokenBal = assetTokenBal;
-            IFPair fpair = IFPair(bonding.getFpair(token));
-            threshold = fpair.kLast() / assetTokenTotal;
+            threshold = fpair.kLast() / (assetTokenTotal + initAmount);
             if(threshold < tokenBal){
                 data.offsetToken = tokenBal - threshold;
             }
@@ -140,7 +143,8 @@ contract QueryData is OwnableUpgradeable{
         address[] memory pairs,
         address[] memory governorTokens,
         address[] memory governors,
-        address[] memory timelocks
+        address[] memory timelocks,
+        address[] memory assetTokens
     ){
         uint256 len = tokens.length;
         uint256 threshold = bonding.gradThreshold();
@@ -160,14 +164,17 @@ contract QueryData is OwnableUpgradeable{
         governorTokens = new address[](len);
         governors = new address[](len);
         timelocks = new address[](len);
+        assetTokens = new address[](len);
         bool status;
         for(uint i=0; i<len; i++){
             (prices[i], totalValues[i], tokenBal, assetTokenBal, assetTokenTotal, status, pairs[i], governorTokens[i], governors[i], timelocks[i]) = getTokenData(threshold, tokens[i]);
+            (address pairAddr, uint256 initAmount) = bonding.getFpair(tokens[i]);
+            IFPair fpair = IFPair(pairAddr);
+            assetTokens[i] = fpair.tokenB();
             if(status){
                 fTokenBals[i] = tokenBal;
                 fNmtTokenBals[i] = assetTokenBal;
-                IFPair fpair = IFPair(bonding.getFpair(tokens[i]));
-                threshold = fpair.kLast() / assetTokenTotal;
+                threshold = fpair.kLast() / (assetTokenTotal + initAmount);
                 if(threshold < tokenBal){
                     offsetTokens[i] = tokenBal - threshold;
                 }
@@ -204,10 +211,11 @@ contract QueryData is OwnableUpgradeable{
         address[] memory tokens = new address[](1);
         tokens[0] = token;
         if(liquidityPools.length ==0){
-            IFPair fpair = IFPair(bonding.getFpair(token));
+            (address pairAddr, uint256 initAmount) = bonding.getFpair(token);
+            IFPair fpair = IFPair(pairAddr);
             (uint256 tokenBal_, uint256 assetBal) = fpair.getReserves();
             tokenBal = tokenBal_;
-            assetTokenBal = assetBal;
+            assetTokenBal = assetBal - initAmount;
             assetTokenTotal= getNmtTotal(threshold, token);
             status = true;
         }else{
@@ -238,7 +246,8 @@ contract QueryData is OwnableUpgradeable{
             token = tokens[i];
             IAgentToken agentToken = IAgentToken(token);
             address[] memory liquidityPools = agentToken.liquidityPools();
-            IFPair fpair = IFPair(bonding.getFpair(token));
+            (address pairAddr, ) = bonding.getFpair(token);
+            IFPair fpair = IFPair(pairAddr);
             if(liquidityPools.length ==0){
                 (uint256 tokenBal, uint256 assetBal) = fpair.getReserves();
                 uint256 decimals1 = 18 - IERC20Metadata(fpair.tokenB()).decimals();
@@ -280,7 +289,8 @@ contract QueryData is OwnableUpgradeable{
     function getNmtTotal(uint256 threshold, address token) public view returns(uint256){
         (, , , , uint256 assetTokenTotal)= bonding.tokenMsg(token);
         if(assetTokenTotal == 0){
-            IFPair fpair = IFPair(bonding.getFpair(token));
+            (address pairAddr, ) = bonding.getFpair(token);
+            IFPair fpair = IFPair(pairAddr);
             uint256 reserveA = IERC20(token).totalSupply();
             uint256 reserveB = fpair.kLast() / reserveA;
             return calculateAmountIn(uint128(reserveA), uint128(reserveB), uint128(reserveA) - uint128(threshold), fpair.kLast());

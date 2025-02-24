@@ -19,7 +19,7 @@ import "../interface/IUniswapV2Router.sol";
 import "../interface/IUniswapV2Factory.sol";
 import "../interface/IGovernor.sol";
 import "../interface/IOwnable.sol";
-import {IWrapToken, IUniswapV2Pair} from "../interface/IInterface.sol";
+import {IWETH, IUniswapV2Pair} from "../interface/IInterface.sol";
 
 contract Bonding is
     Initializable,
@@ -142,7 +142,7 @@ contract Bonding is
         uniswapRouter_ != address(0) && tokenAdmin_ != address(0) && agentTokenImpl_ != address(0) && defaultDelegatee_ != address(0) &&
         governorTokenImpl_ != address(0) && governorImpl_ != address(0) && timelockControllerImpl_ != address(0), "address err");
         factory = FFactory(factory_);
-        router = FRouter(router_);
+        router = FRouter(payable(router_));
 
         feeTo = feeTo_;
         fee = (fee_ * 1 ether) / 1000;
@@ -377,8 +377,8 @@ contract Bonding is
         return lunachMsg[token];
     }
 
-    function getFpair(address token) public view returns (address) {
-        return tokenInfo[token].pair;
+    function getFpair(address token) public view returns (address, uint256) {
+        return (tokenInfo[token].pair, tokenInfo[token].data.marketCap);
     }
 
     function getGovernorMsg() public view returns (address, address, address, address) {
@@ -465,7 +465,8 @@ contract Bonding is
         require(purchaseAmount > _lunachMsg.lunachfee, "purchaseAmount error");
         uint256 initialPurchase = (purchaseAmount - _lunachMsg.lunachfee);
         if(assetToken_ == address(0)){
-            payable(feeTo).transfer(_lunachMsg.lunachfee);
+            IWETH(weth).deposit{value: _lunachMsg.lunachfee}();
+            IWETH(weth).transfer(feeTo, _lunachMsg.lunachfee);
         }else{
             require(
                 IERC20(assetToken).balanceOf(msg.sender) >= purchaseAmount,
@@ -581,7 +582,6 @@ contract Bonding is
         if(IFPair(pairAddress).tokenB() == weth){
             amountIn = msg.value;
             (, amountOut) = router.buyWithETH{value: amountIn}(amountIn, pairAddress, msg.sender);
-            IERC20(tokenAddress).transfer(msg.sender, amountOut);
         }else{
             require(msg.value == 0,"msg.value error");
             (, amountOut) = router.buy(amountIn, pairAddress, msg.sender );
@@ -589,14 +589,14 @@ contract Bonding is
         require(amountOut >= amountOutMin, "amountOutMin error");
         (uint256 reserveA, uint256 reserveB) = IFPair(pairAddress).getReserves();
         tokenInfo[tokenAddress].data.price = IFPair(pairAddress).priceBLast();
-        if (getGradeSta(tokenAddress, reserveA, reserveB)  && tokenInfo[tokenAddress].trading) {
+        if (getGradeSta(tokenAddress, reserveA, reserveB) && tokenInfo[tokenAddress].trading) {
             _openTradingOnUniswap(tokenAddress);
         }
     }
 
-    function getGradeSta(address token, uint256 reserveA, uint256 reserveB) private view returns(bool){
+    function getGradeSta(address token, uint256 reserveA, uint256 reserveB) public view returns(bool){
         if(tokenMsg[token].gradeLimit != 0){
-            return reserveB >= tokenMsg[token].gradeLimit;
+            return reserveB - tokenInfo[token].data.marketCap >= tokenMsg[token].gradeLimit;
         }else{
             return reserveA <= gradThreshold;
         }
@@ -622,7 +622,7 @@ contract Bonding is
         _token.trading = false;
         _token.tradingOnUniswap = true;
         address assetToken = IFPair(tokenInfo[tokenAddress].pair).tokenB();
-        router.graduate(tokenAddress);
+        router.graduate(tokenInfo[tokenAddress].pair);
         address lp = _addInitialLiquidity(token_, IERC20(assetToken));
         agentFactory.graduate(address(token_), lp);
     }

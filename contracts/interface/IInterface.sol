@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.0;
 
-interface IWrapToken {
+interface IWETH {
     function deposit() external payable;
     function withdraw(uint wad) external;
     function approve(address guy, uint wad) external returns (bool);
