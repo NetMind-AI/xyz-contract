@@ -282,7 +282,7 @@ contract QueryData is OwnableUpgradeable{
     }
 
     function getAssetTokenPair(address token) public view returns (address) {
-        if(token == address(0))token = bonding.wrapToken();
+        if(token == address(0))token = bonding.weth();
         return assetTokenPair[token];
     }
 

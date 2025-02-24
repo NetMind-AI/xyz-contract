@@ -261,6 +261,6 @@ contract FRouter is
         IFPair(pair).approval(spender, asset, amount);
     }
 
-    fallback() external payable{
+    receive() external payable{
     }
 }
