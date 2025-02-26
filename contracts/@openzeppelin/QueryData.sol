@@ -27,7 +27,17 @@ interface IUniswapV2Pair {
     function token0() external view returns (address);
     function token1() external view returns (address);
     function getReserves() external view returns (uint112 reserve0, uint112 reserve1, uint32 blockTimestampLast);
+    function balanceOf(address account) external view returns (uint256);
+}
 
+interface IGovernorToken {
+    function delegates(address account) external view returns (address);
+    function getVotes(address account) external view returns (uint256);
+    function balanceOf(address account) external view returns (uint256);
+}
+
+interface IGovernor {
+    function proposalThreshold() external view returns (uint256);
 }
 
 interface IFPair {
@@ -311,6 +321,25 @@ contract QueryData is OwnableUpgradeable{
         require(newReserveB > reserveB, "Invalid reserves");
         amountIn = uint128(newReserveB - uint256(reserveB));
         return amountIn;
+    }
+
+    function getGovernorMsg(address token, address userAddr) public view
+    returns (
+        uint256 notDelegated,
+        address delegatedAddr,
+        uint256 delegateVotingPower,
+        uint256 myVotingPower,
+        uint256 proposalThreshold
+    ) {
+        (address governorTokenAddr, address governorAddr, , address pairAddr,)= bonding.tokenMsg(token);
+        IGovernorToken governorToken = IGovernorToken(governorTokenAddr);
+        IGovernor governor = IGovernor(governorAddr);
+        IUniswapV2Pair pair = IUniswapV2Pair(pairAddr);
+        notDelegated = pair.balanceOf(userAddr);
+        delegatedAddr = governorToken.delegates(userAddr);
+        delegateVotingPower = governorToken.balanceOf(userAddr);
+        myVotingPower = governorToken.getVotes(userAddr);
+        proposalThreshold = governor.proposalThreshold();
     }
 
 }
