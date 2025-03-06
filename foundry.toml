@@ -7,7 +7,7 @@ cache_path  = 'forge-cache'
 evm_version = "cancun"
 # See more config options https://github.com/foundry-rs/foundry/tree/master/config
 
-solc = "0.8.22"
+solc = "0.8.26"
 optimizer = true
 runs = 200
 via-ir = true

@@ -91,6 +91,7 @@ contract Bonding is
         bool tradingOnUniswap;
         string motivation;
         string model;
+        string jsonMsg;
     }
 
     struct Data {
@@ -112,7 +113,7 @@ contract Bonding is
 
     event Launched(address indexed token, address indexed pair);
     event Graduated(address indexed token, address indexed uniPair, address governorToken, address governor, address timelockController);
-    event UpdateTokenMsg(address indexed token, string description, string model, string twitter, string telegram, string youtube, string website, string keyHash, string motivation, uint256 proposeId, string proposeDesc);
+    event UpdateTokenMsg(address indexed token, string description, string model, string twitter, string telegram, string youtube, string website, string keyHash, string motivation, string jsonMsg, uint256 proposeId, string proposeDesc);
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -257,7 +258,8 @@ contract Bonding is
         string memory keyHash,
         string memory motivation,
         string memory description,
-        string memory model
+        string memory model,
+        string memory jsonMsg
     ) public {
         address creator = tokenInfo[token].creator;
         ProposeMsg memory proposeMsg_;
@@ -294,17 +296,22 @@ contract Bonding is
         }else{
             motivation = "";
         }
-        if(bytes(description).length > 2 && auth(creator, token, bytes(tokenInfo[token].motivation).length, false, false)){
-            tokenInfo[token].motivation = description;
+        if(bytes(description).length > 2 && auth(creator, token, bytes(tokenInfo[token].description).length, false, false)){
+            tokenInfo[token].description = description;
         }else{
             description = "";
         }
-        if(bytes(model).length > 2 && auth(creator, token, bytes(tokenInfo[token].motivation).length, false, false)){
-            tokenInfo[token].motivation = model;
+        if(bytes(model).length > 2 && auth(creator, token, bytes(tokenInfo[token].model).length, false, false)){
+            tokenInfo[token].model = model;
         }else{
             model = "";
         }
-        emit UpdateTokenMsg(token, description, model, twitter, telegram, youtube, website, keyHash, motivation, proposeMsg_.proposeId, proposeMsg_.proposeDesc);
+        if(bytes(jsonMsg).length > 2 && auth(creator, token, bytes(tokenInfo[token].jsonMsg).length, false, false)){
+            tokenInfo[token].jsonMsg = jsonMsg;
+        }else{
+            jsonMsg = "";
+        }
+        emit UpdateTokenMsg(token, description, model, twitter, telegram, youtube, website, keyHash, motivation, jsonMsg, proposeMsg_.proposeId, proposeMsg_.proposeDesc);
     }
 
     function auth(address creator, address token, uint256 len, bool kind, bool status) internal view returns(bool){
@@ -444,17 +451,16 @@ contract Bonding is
         string memory _ticker,
         string memory eid,
         string memory model,
-        string memory desc,
+        string memory description,
         string memory motivation,
         string memory img,
         string[5] memory urls,
-        address assetToken_,
+        string memory jsonMsg,
+        address assetToken,
         uint256 purchaseAmount,
         uint256 gradeLimit
     ) public payable nonReentrant {
-        address assetToken = assetToken_;
-        if(assetToken_ == address(0)){
-            assetToken = weth;
+        if(assetToken == weth){
             purchaseAmount = msg.value;
         }else{
             require(msg.value == 0,"msg.value error");
@@ -464,7 +470,7 @@ contract Bonding is
         require(_lunachMsg.upperLimit >= gradeLimit && _lunachMsg.lowerLimit <= gradeLimit,"Limit error");
         require(purchaseAmount > _lunachMsg.lunachfee, "purchaseAmount error");
         uint256 initialPurchase = (purchaseAmount - _lunachMsg.lunachfee);
-        if(assetToken_ == address(0)){
+        if(assetToken == weth){
             IWETH(weth).deposit{value: _lunachMsg.lunachfee}();
             IWETH(weth).transfer(feeTo, _lunachMsg.lunachfee);
         }else{
@@ -489,7 +495,8 @@ contract Bonding is
             eid,
             model,
             address(token),
-            _pair
+            _pair,
+            assetToken
         );
         bytes memory tokenParams = abi.encode(
             initialSupply,
@@ -523,7 +530,7 @@ contract Bonding is
             agentToken: address(token),
             pair: _pair,
             data: _data,
-            description: desc,
+            description: description,
             image: img,
             twitter: urls[0],
             telegram: urls[1],
@@ -533,12 +540,13 @@ contract Bonding is
             trading: true,
             tradingOnUniswap: false,
             motivation: motivation,
-            model: model
+            model: model,
+            jsonMsg: jsonMsg
         });
         tokenInfo[address(token)] = tmpToken;
         tokenInfos.push(address(token));
         emit Launched(address(token), _pair);
-        emit UpdateTokenMsg(address(token), desc, model, urls[0], urls[1], urls[2], urls[3], urls[4], motivation, 0, '');
+        emit UpdateTokenMsg(address(token), description, model, urls[0], urls[1], urls[2], urls[3], urls[4], motivation, jsonMsg, 0, '');
 
         // Make initial purchase
         if(IFPair(_pair).tokenB() == weth){

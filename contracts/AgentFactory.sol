@@ -42,7 +42,7 @@ contract AgentFactory is
 
 
 
-    event NewApplication(uint256 agentId, string name, address token, string sgentEID);
+    event NewApplication(uint256 agentId, string name, address token, string sgentEID, address assetToken);
     event Graduate(uint256 id, address newDexPair);
 
     modifier onlyBonding() {
@@ -81,7 +81,8 @@ contract AgentFactory is
         string memory agentEID,
         string memory agentModel,
         address token,
-        address fundPair
+        address fundPair,
+        address assetToken
     ) public onlyBonding {
         _registerAgentEID(agentEID);
         uint256 id = ++_nextId;
@@ -104,7 +105,7 @@ contract AgentFactory is
         _applicationIds[token] = id;
 
         allTokens.push(token);
-        emit NewApplication(id, name, token, agentEID);
+        emit NewApplication(id, name, token, agentEID, assetToken);
     }
 
     function graduate(address token, address dexPair) public onlyBonding{
